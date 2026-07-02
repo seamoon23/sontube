@@ -94,6 +94,7 @@ model KidsVideoSignal {
   @@unique([videoId, clientKey, type])
   @@index([type])
   @@index([videoId])
+  @@index([updatedAt])
 }
 
 model AppSetting {

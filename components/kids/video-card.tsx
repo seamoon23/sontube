@@ -20,7 +20,7 @@ export function KidsVideoCard({ video }: { video: KidsVideoCardData }) {
 
   return (
     <article className="group grid gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft">
-      <Link href={`/kids/watch/${video.id}`} className="grid gap-3">
+      <Link href={`/kids/watch/${video.id}`} aria-label={`${video.title} 보기`} className="grid gap-3">
         <div className="overflow-hidden rounded-md bg-slate-100">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -32,7 +32,7 @@ export function KidsVideoCard({ video }: { video: KidsVideoCardData }) {
       </Link>
       <div className="grid gap-2">
         <Link href={`/kids/watch/${video.id}`}>
-          <h2 className="line-clamp-2 text-base font-bold leading-snug text-ink">{video.title}</h2>
+          <h2 className="line-clamp-2 break-words text-base font-bold leading-snug text-ink">{video.title}</h2>
         </Link>
         <div className="flex flex-wrap gap-1.5">
           {video.tags.slice(0, 3).map(({ tag }) => (

@@ -3,9 +3,9 @@
 import { PlayMode, Prisma, SafetyStatus, ThumbnailType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { validateCustomThumbnailFile } from "@/lib/custom-thumbnail";
+import { resolveManagedCustomThumbnailPath, validateCustomThumbnailFile } from "@/lib/custom-thumbnail";
 import { prisma } from "@/lib/db";
 import { requireAdminSession } from "@/lib/admin-session";
 import { splitTagNames, slugifyTagName } from "@/lib/tags";
@@ -124,6 +124,7 @@ export async function updateVideoAction(videoId: string, formData: FormData): Pr
 
   const previousTagIds = existing.tags.map((tag) => tag.tagId);
   const tagIds = await resolveTagIds(parsed.data.tagIds ?? [], parsed.data.quickNewTags ?? "");
+  const previousCustomThumbnailPath = existing.customThumbnailPath;
   const thumbnail = await resolveThumbnail(
     formData,
     videoIdResult.videoId,
@@ -164,6 +165,10 @@ export async function updateVideoAction(videoId: string, formData: FormData): Pr
 
     await refreshTagStats(tx, [...previousTagIds, ...tagIds]);
   });
+
+  if (previousCustomThumbnailPath && previousCustomThumbnailPath !== thumbnail.value.customThumbnailPath) {
+    await deleteManagedCustomThumbnailIfUnused(previousCustomThumbnailPath);
+  }
 
   revalidateVideoPaths();
   redirect("/admin/videos");
@@ -369,6 +374,26 @@ async function saveCustomThumbnail(formData: FormData, youtubeVideoId: string) {
     ok: true as const,
     path: `/uploads/thumbnails/${fileName}`,
   };
+}
+
+async function deleteManagedCustomThumbnailIfUnused(publicPath: string) {
+  const remainingReferences = await prisma.video.count({
+    where: { customThumbnailPath: publicPath },
+  });
+  if (remainingReferences > 0) return;
+
+  const filePath = resolveManagedCustomThumbnailPath(publicPath);
+  if (!filePath) return;
+
+  try {
+    await unlink(filePath);
+  } catch (error) {
+    if (typeof error === "object" && error && "code" in error && error.code === "ENOENT") {
+      return;
+    }
+
+    console.warn(`Failed to delete custom thumbnail: ${publicPath}`, error);
+  }
 }
 
 async function refreshTagStats(tx: Prisma.TransactionClient, tagIds: string[]) {

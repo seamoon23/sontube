@@ -31,6 +31,7 @@ if (existsSync(dbPath)) {
     'CREATE UNIQUE INDEX IF NOT EXISTS "KidsVideoSignal_videoId_clientKey_type_key" ON "KidsVideoSignal"("videoId", "clientKey", "type");',
     'CREATE INDEX IF NOT EXISTS "KidsVideoSignal_type_idx" ON "KidsVideoSignal"("type");',
     'CREATE INDEX IF NOT EXISTS "KidsVideoSignal_videoId_idx" ON "KidsVideoSignal"("videoId");',
+    'CREATE INDEX IF NOT EXISTS "KidsVideoSignal_updatedAt_idx" ON "KidsVideoSignal"("updatedAt");',
   ];
 
   if (applySqlStatements(upgradeStatements, { ignoreDuplicateColumns: true })) {
@@ -97,6 +98,7 @@ const createStatements = [
   'CREATE UNIQUE INDEX IF NOT EXISTS "KidsVideoSignal_videoId_clientKey_type_key" ON "KidsVideoSignal"("videoId", "clientKey", "type");',
   'CREATE INDEX IF NOT EXISTS "KidsVideoSignal_type_idx" ON "KidsVideoSignal"("type");',
   'CREATE INDEX IF NOT EXISTS "KidsVideoSignal_videoId_idx" ON "KidsVideoSignal"("videoId");',
+  'CREATE INDEX IF NOT EXISTS "KidsVideoSignal_updatedAt_idx" ON "KidsVideoSignal"("updatedAt");',
   `CREATE TABLE IF NOT EXISTS "AppSetting" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "key" TEXT NOT NULL,

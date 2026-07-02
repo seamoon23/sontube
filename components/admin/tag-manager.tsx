@@ -54,6 +54,7 @@ export function TagManager({ tags }: TagManagerProps) {
 
       {message && (
         <p
+          role={message.ok ? "status" : "alert"}
           className={`rounded-md border px-4 py-3 text-sm ${
             message.ok ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-800"
           }`}
@@ -70,9 +71,9 @@ export function TagManager({ tags }: TagManagerProps) {
             className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="font-semibold text-ink">{tag.name}</p>
-                <p className="text-xs text-slate-500">
+              <div className="min-w-0">
+                <p className="break-words font-semibold text-ink">{tag.name}</p>
+                <p className="break-all text-xs text-slate-500">
                   slug: {tag.slug} · 사용 {tag.usageCount}회
                 </p>
               </div>

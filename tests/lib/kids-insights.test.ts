@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildKidsInsightPrompt, summarizeKidsSignals } from "@/lib/kids-insights";
+import {
+  buildKidsInsightPrompt,
+  getKidsInsightPeriod,
+  summarizeKidsSignals,
+} from "@/lib/kids-insights";
 
 const records = [
   {
@@ -63,5 +67,43 @@ describe("buildKidsInsightPrompt", () => {
     expect(prompt).toContain("외부 API 없이");
     expect(prompt).not.toContain("client");
     expect(prompt).not.toContain("video-1");
+  });
+
+  it("mentions the selected summary period", () => {
+    const prompt = buildKidsInsightPrompt(summarizeKidsSignals(records), {
+      periodLabel: "최근 7일",
+    });
+
+    expect(prompt).toContain("요약 기간: 최근 7일");
+  });
+});
+
+describe("getKidsInsightPeriod", () => {
+  it("supports 7 day, 30 day, and all-time summaries", () => {
+    const now = new Date("2026-07-03T00:00:00.000Z");
+
+    expect(getKidsInsightPeriod("7d", now)).toEqual({
+      value: "7d",
+      label: "최근 7일",
+      since: new Date("2026-06-26T00:00:00.000Z"),
+    });
+    expect(getKidsInsightPeriod("30d", now)).toEqual({
+      value: "30d",
+      label: "최근 30일",
+      since: new Date("2026-06-03T00:00:00.000Z"),
+    });
+    expect(getKidsInsightPeriod("all", now)).toEqual({
+      value: "all",
+      label: "전체",
+      since: null,
+    });
+  });
+
+  it("falls back to all time for unknown values", () => {
+    expect(getKidsInsightPeriod("forever", new Date("2026-07-03T00:00:00.000Z"))).toEqual({
+      value: "all",
+      label: "전체",
+      since: null,
+    });
   });
 });

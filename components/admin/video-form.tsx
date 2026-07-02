@@ -148,7 +148,7 @@ export function VideoForm({ mode, initial, tags, existingVideos }: VideoFormProp
             <p className="mt-2 text-sm text-amber-700">{parsedUrl.message}</p>
           )}
           {parsedUrl.ok && (
-            <p className="mt-2 text-sm text-leaf">videoId: {parsedUrl.videoId}</p>
+            <p className="mt-2 break-all text-sm text-leaf">videoId: {parsedUrl.videoId}</p>
           )}
         </div>
 
@@ -315,10 +315,15 @@ export function VideoForm({ mode, initial, tags, existingVideos }: VideoFormProp
           accept="image/png,image/jpeg,image/webp"
           className="block w-full text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-700"
         />
+        <p className="text-xs leading-5 text-slate-500">
+          수정 화면에서 YouTube 기본 썸네일이나 Placeholder를 선택하면 기존 커스텀 썸네일 연결은 제거됩니다.
+        </p>
       </section>
 
       {result && !result.ok && (
-        <p className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{result.message}</p>
+        <p className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+          {result.message}
+        </p>
       )}
 
       <div className="flex justify-end">

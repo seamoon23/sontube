@@ -1,8 +1,8 @@
-import { Prisma, SafetyStatus } from "@prisma/client";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getThumbnailUrl } from "@/lib/thumbnails";
 import { requireAdminSession } from "@/lib/admin-session";
+import { buildAdminVideoWhere } from "@/lib/admin-video-filters";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +11,8 @@ type VideosPageProps = {
     q?: string;
     tag?: string;
     status?: string;
+    recommended?: string;
+    thumbnail?: string;
   }>;
 };
 
@@ -21,29 +23,9 @@ export default async function AdminVideosPage({ searchParams }: VideosPageProps)
   const q = params.q?.trim() ?? "";
   const tagId = params.tag ?? "";
   const status = params.status ?? "";
-  const where: Prisma.VideoWhereInput = {};
-
-  if (q) {
-    where.OR = [
-      { title: { contains: q } },
-      { description: { contains: q } },
-      { searchKeywords: { contains: q } },
-      { youtubeVideoId: { contains: q } },
-    ];
-  }
-
-  if (tagId) {
-    where.tags = { some: { tagId } };
-  }
-
-  if (status === "published") {
-    where.isPublished = true;
-    where.safetyStatus = SafetyStatus.PARENT_CHECKED;
-  } else if (status === "review") {
-    where.safetyStatus = SafetyStatus.NEEDS_REVIEW;
-  } else if (status === "hidden") {
-    where.safetyStatus = SafetyStatus.HIDDEN;
-  }
+  const recommended = params.recommended ?? "";
+  const thumbnail = params.thumbnail ?? "";
+  const where = buildAdminVideoWhere({ q, tagId, status, recommended, thumbnail });
 
   const [videos, tags] = await Promise.all([
     prisma.video.findMany({
@@ -77,28 +59,61 @@ export default async function AdminVideosPage({ searchParams }: VideosPageProps)
         </Link>
       </div>
 
-      <form className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_180px_180px_auto]">
-        <input
-          name="q"
-          defaultValue={q}
-          placeholder="제목, 설명, videoId"
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-        />
-        <select name="tag" defaultValue={tagId} className="rounded-md border border-slate-300 px-3 py-2 text-sm">
-          <option value="">모든 태그</option>
-          {tags.map((tag) => (
-            <option key={tag.id} value={tag.id}>
-              {tag.name}
-            </option>
-          ))}
-        </select>
-        <select name="status" defaultValue={status} className="rounded-md border border-slate-300 px-3 py-2 text-sm">
-          <option value="">모든 상태</option>
-          <option value="published">공개</option>
-          <option value="review">검토 필요</option>
-          <option value="hidden">숨김</option>
-        </select>
-        <button type="submit" className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
+      <form className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_160px_160px_160px_180px_auto]">
+        <label className="grid gap-1 text-xs font-semibold text-slate-600">
+          검색
+          <input
+            name="q"
+            defaultValue={q}
+            placeholder="제목, 설명, videoId"
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="grid gap-1 text-xs font-semibold text-slate-600">
+          태그
+          <select name="tag" defaultValue={tagId} className="rounded-md border border-slate-300 px-3 py-2 text-sm">
+            <option value="">모든 태그</option>
+            {tags.map((tag) => (
+              <option key={tag.id} value={tag.id}>
+                {tag.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs font-semibold text-slate-600">
+          상태
+          <select name="status" defaultValue={status} className="rounded-md border border-slate-300 px-3 py-2 text-sm">
+            <option value="">모든 상태</option>
+            <option value="published">공개</option>
+            <option value="review">검토 필요</option>
+            <option value="hidden">숨김</option>
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs font-semibold text-slate-600">
+          추천
+          <select
+            name="recommended"
+            defaultValue={recommended}
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+          >
+            <option value="">전체</option>
+            <option value="1">부모 추천</option>
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs font-semibold text-slate-600">
+          썸네일
+          <select
+            name="thumbnail"
+            defaultValue={thumbnail}
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+          >
+            <option value="">모든 썸네일</option>
+            <option value="YOUTUBE">YouTube 기본</option>
+            <option value="CUSTOM">커스텀</option>
+            <option value="PLACEHOLDER">Placeholder</option>
+          </select>
+        </label>
+        <button type="submit" className="self-end rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
           검색
         </button>
       </form>
@@ -114,10 +129,10 @@ export default async function AdminVideosPage({ searchParams }: VideosPageProps)
           <article key={video.id} className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-[180px_1fr_auto]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={getThumbnailUrl(video)} alt="" className="aspect-video w-full rounded-md object-cover" />
-            <div className="grid gap-2">
+            <div className="grid min-w-0 gap-2">
               <div>
-                <h3 className="text-lg font-semibold text-ink">{video.title}</h3>
-                <p className="text-xs text-slate-500">{video.youtubeVideoId}</p>
+                <h3 className="break-words text-lg font-semibold text-ink">{video.title}</h3>
+                <p className="break-all text-xs text-slate-500">{video.youtubeVideoId}</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 {video.tags.map(({ tag }) => (

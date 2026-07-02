@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { KidsInsightPromptCopy } from "@/components/admin/kids-insight-prompt-copy";
 import { requireAdminSession } from "@/lib/admin-session";
 import { prisma } from "@/lib/db";
 import {
   buildKidsInsightPrompt,
+  getKidsInsightPeriod,
   summarizeKidsSignals,
   type CountedLabel,
   type CountedVideo,
@@ -12,10 +14,30 @@ import { getKidsSignalLabel, KIDS_SIGNAL_TYPES } from "@/lib/kids-signals";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminKidsInsightsPage() {
+type AdminKidsInsightsPageProps = {
+  searchParams: Promise<{
+    period?: string;
+  }>;
+};
+
+const periodOptions = [
+  { value: "7d", label: "최근 7일" },
+  { value: "30d", label: "최근 30일" },
+  { value: "all", label: "전체" },
+];
+
+export default async function AdminKidsInsightsPage({ searchParams }: AdminKidsInsightsPageProps) {
   await requireAdminSession();
 
+  const params = await searchParams;
+  const period = getKidsInsightPeriod(params.period);
+
   const signals = await prisma.kidsVideoSignal.findMany({
+    where: period.since
+      ? {
+          updatedAt: { gte: period.since },
+        }
+      : undefined,
     include: {
       video: {
         include: {
@@ -27,7 +49,6 @@ export default async function AdminKidsInsightsPage() {
       },
     },
     orderBy: { updatedAt: "desc" },
-    take: 500,
   });
 
   const records: KidsInsightRecord[] = signals.map((signal) => ({
@@ -41,7 +62,7 @@ export default async function AdminKidsInsightsPage() {
   }));
   const summary = summarizeKidsSignals(records);
   const playlistSummary = summarizeKidsSignals(records.filter((record) => record.type === "PLAYLIST"));
-  const prompt = buildKidsInsightPrompt(summary);
+  const prompt = buildKidsInsightPrompt(summary, { periodLabel: period.label });
   const signalStats = KIDS_SIGNAL_TYPES.map((type) => ({
     type,
     label: getKidsSignalLabel(type),
@@ -50,12 +71,30 @@ export default async function AdminKidsInsightsPage() {
 
   return (
     <div className="grid gap-6">
-      <div>
-        <p className="text-sm font-semibold text-ocean">관심 요약</p>
-        <h2 className="text-2xl font-bold text-ink">아이의 영상 반응</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          아이 화면에서 누른 반응과 내 목록 담기를 모아 보여줍니다. 영상은 보호자가 등록한 목록 안에서만 집계합니다.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-ocean">관심 요약</p>
+          <h2 className="text-2xl font-bold text-ink">아이의 영상 반응</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            아이 화면에서 누른 반응과 내 목록 담기를 모아 보여줍니다. 영상은 보호자가 등록한 목록 안에서만 집계합니다.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2" aria-label="관심 요약 기간">
+          {periodOptions.map((option) => (
+            <Link
+              key={option.value}
+              href={`/admin/insights?period=${option.value}`}
+              aria-current={period.value === option.value ? "page" : undefined}
+              className={`rounded-md border px-3 py-2 text-sm font-bold ${
+                period.value === option.value
+                  ? "border-ink bg-ink text-white"
+                  : "border-slate-300 bg-white text-slate-700 hover:border-ocean"
+              }`}
+            >
+              {option.label}
+            </Link>
+          ))}
+        </div>
       </div>
 
       <section className="grid gap-3 md:grid-cols-4">

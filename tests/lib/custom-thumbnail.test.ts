@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { validateCustomThumbnailFile } from "@/lib/custom-thumbnail";
+import path from "node:path";
+import { resolveManagedCustomThumbnailPath, validateCustomThumbnailFile } from "@/lib/custom-thumbnail";
 
 describe("validateCustomThumbnailFile", () => {
   it("accepts supported image files under the size limit", () => {
@@ -29,5 +30,21 @@ describe("validateCustomThumbnailFile", () => {
       ok: false,
       message: "커스텀 썸네일은 2MB 이하 이미지만 업로드할 수 있습니다.",
     });
+  });
+});
+
+describe("resolveManagedCustomThumbnailPath", () => {
+  it("resolves app-managed uploaded thumbnails under the public uploads folder", () => {
+    const root = path.resolve("/app");
+
+    expect(resolveManagedCustomThumbnailPath("/uploads/thumbnails/abc.png", root)).toBe(
+      path.join(root, "public", "uploads", "thumbnails", "abc.png"),
+    );
+  });
+
+  it("rejects paths outside the managed thumbnail directory", () => {
+    expect(resolveManagedCustomThumbnailPath("/thumbnail-placeholder.svg", "/app")).toBeNull();
+    expect(resolveManagedCustomThumbnailPath("https://img.youtube.com/vi/demo/hqdefault.jpg", "/app")).toBeNull();
+    expect(resolveManagedCustomThumbnailPath("/uploads/thumbnails/../secret.txt", "/app")).toBeNull();
   });
 });

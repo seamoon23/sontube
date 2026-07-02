@@ -37,6 +37,8 @@ export function KidsPlaylistButton({ item }: { item: KidsPlaylistItem }) {
     <button
       type="button"
       onClick={toggle}
+      aria-pressed={isSaved}
+      aria-label={`${item.title} ${isSaved ? "내 목록에서 빼기" : "내 목록에 담기"}`}
       className={`rounded-md px-3 py-2 text-sm font-bold transition ${
         isSaved ? "bg-coral text-white" : "border border-slate-300 bg-white text-slate-700 hover:border-coral"
       }`}
@@ -73,11 +75,12 @@ export function KidsPlaylistPanel() {
           <a
             key={item.id}
             href={`/kids/watch/${item.id}`}
+            aria-label={`${item.title} 보기`}
             className="grid w-44 shrink-0 gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={item.thumbnailUrl} alt="" className="aspect-video w-full rounded-md object-cover" />
-            <span className="line-clamp-2 text-sm font-bold text-ink">{item.title}</span>
+            <span className="line-clamp-2 break-words text-sm font-bold text-ink">{item.title}</span>
           </a>
         ))}
       </div>

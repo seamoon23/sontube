@@ -75,7 +75,11 @@ export default async function KidsPage({ searchParams }: KidsPageProps) {
             <h1 className="text-3xl font-black text-ink md:text-4xl">영상서랍</h1>
           </div>
           <form className="grid gap-3 md:grid-cols-[1fr_auto]">
+            <label htmlFor="kids-search" className="sr-only">
+              제목 또는 부모님 키워드 검색
+            </label>
             <input
+              id="kids-search"
               name="q"
               defaultValue={q}
               placeholder="제목 또는 부모님 키워드 검색"
@@ -90,6 +94,7 @@ export default async function KidsPage({ searchParams }: KidsPageProps) {
             <div className="flex gap-2 overflow-x-auto pb-1">
               <Link
                 href={q ? `/kids?q=${encodeURIComponent(q)}` : "/kids"}
+                aria-current={tagSlug ? undefined : "page"}
                 className={`whitespace-nowrap rounded-md border px-3 py-2 text-sm font-bold ${
                   tagSlug ? "border-slate-300 bg-white text-slate-700" : "border-ink bg-ink text-white"
                 }`}
@@ -100,6 +105,7 @@ export default async function KidsPage({ searchParams }: KidsPageProps) {
                 <Link
                   key={tag.id}
                   href={`/kids?${new URLSearchParams({ ...(q ? { q } : {}), tag: tag.slug }).toString()}`}
+                  aria-current={tagSlug === tag.slug ? "page" : undefined}
                   className={`whitespace-nowrap rounded-md border px-3 py-2 text-sm font-bold ${
                     tagSlug === tag.slug ? "border-ink bg-ink text-white" : "border-slate-300 bg-white text-slate-700"
                   }`}

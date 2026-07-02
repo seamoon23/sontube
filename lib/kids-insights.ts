@@ -29,6 +29,14 @@ export type KidsInsightSummary = {
   topTags: CountedLabel[];
 };
 
+export type KidsInsightPeriodValue = "7d" | "30d" | "all";
+
+export type KidsInsightPeriod = {
+  value: KidsInsightPeriodValue;
+  label: string;
+  since: Date | null;
+};
+
 export function summarizeKidsSignals(records: readonly KidsInsightRecord[]): KidsInsightSummary {
   const signalCounts = new Map<KidsSignalType, number>();
   const videoCounts = new Map<string, CountedVideo>();
@@ -63,7 +71,42 @@ export function summarizeKidsSignals(records: readonly KidsInsightRecord[]): Kid
   };
 }
 
-export function buildKidsInsightPrompt(summary: KidsInsightSummary): string {
+export function getKidsInsightPeriod(value: string | undefined, now = new Date()): KidsInsightPeriod {
+  if (value === "7d") {
+    return {
+      value: "7d",
+      label: "최근 7일",
+      since: subtractDays(now, 7),
+    };
+  }
+
+  if (value === "all") {
+    return {
+      value: "all",
+      label: "전체",
+      since: null,
+    };
+  }
+
+  if (value === "30d") {
+    return {
+      value: "30d",
+      label: "최근 30일",
+      since: subtractDays(now, 30),
+    };
+  }
+
+  return {
+    value: "all",
+    label: "전체",
+    since: null,
+  };
+}
+
+export function buildKidsInsightPrompt(
+  summary: KidsInsightSummary,
+  options: { periodLabel?: string } = {},
+): string {
   const signalLines = KIDS_SIGNAL_TYPES.map((type) => ({ type, count: summary.signalCounts[type] ?? 0 }))
     .filter(({ count }) => count > 0)
     .map(({ type, count }) => `- ${getKidsSignalLabel(type)}: ${count}`)
@@ -76,6 +119,7 @@ export function buildKidsInsightPrompt(summary: KidsInsightSummary): string {
     "다음은 SonTube 안에서 보호자가 직접 등록한 승인 영상에 대한 아이의 관심 신호 요약입니다.",
     "외부 API 없이 아래 통계만 보고, 아이에게 더 넣어주면 좋을 영상 방향을 제안해 주세요.",
     "",
+    options.periodLabel ? `요약 기간: ${options.periodLabel}` : null,
     `총 신호 수: ${summary.totalSignals}`,
     "",
     "반응 종류:",
@@ -94,7 +138,15 @@ export function buildKidsInsightPrompt(summary: KidsInsightSummary): string {
     "1. 아이가 좋아하는 주제 패턴을 3가지로 요약해 주세요.",
     "2. 다음에 보호자가 직접 검토해 추가하면 좋을 영상 후보 방향을 5가지 제안해 주세요.",
     "3. 너무 자극적인 추천으로 흐르지 않도록 주의할 점을 알려 주세요.",
-  ].join("\n");
+  ]
+    .filter((line) => line !== null)
+    .join("\n");
+}
+
+function subtractDays(value: Date, days: number): Date {
+  const next = new Date(value);
+  next.setUTCDate(next.getUTCDate() - days);
+  return next;
 }
 
 function splitKeywords(value: string | null): string[] {

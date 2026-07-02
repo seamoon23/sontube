@@ -30,8 +30,14 @@ export function KidsInsightPromptCopy({ prompt }: { prompt: string }) {
       <textarea
         readOnly
         value={prompt}
+        aria-label="AI 분석용 요약 프롬프트"
         className="min-h-80 w-full rounded-md border border-slate-300 bg-slate-50 p-4 text-sm leading-6 text-slate-700"
       />
+      {status === "failed" && (
+        <p className="text-sm font-semibold text-amber-700" role="status">
+          브라우저 복사가 막혀 있으면 프롬프트를 직접 선택해 복사해 주세요.
+        </p>
+      )}
     </div>
   );
 }

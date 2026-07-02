@@ -40,7 +40,9 @@ export function KidsFeedbackButtons({ videoId }: { videoId: string }) {
     <div className="grid gap-3 rounded-lg border border-white/10 bg-white/5 p-4">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-lg font-black text-white">어땠어?</h2>
-        <span className="min-h-5 text-sm font-semibold text-sky-100">{isSaving ? "저장 중" : message}</span>
+        <span className="min-h-5 text-sm font-semibold text-sky-100" role="status">
+          {isSaving ? "저장 중" : message}
+        </span>
       </div>
       <div className="flex flex-wrap gap-2">
         {KIDS_SIGNAL_OPTIONS.map((option) => (
@@ -48,6 +50,7 @@ export function KidsFeedbackButtons({ videoId }: { videoId: string }) {
             key={option.type}
             type="button"
             onClick={() => choose(option.type)}
+            aria-pressed={selected === option.type}
             className={`rounded-md border px-3 py-2 text-sm font-bold transition ${
               selected === option.type ? "border-white bg-white text-ink" : toneClassNames[option.tone]
             }`}
