@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { recordKidsSignalAction } from "@/app/kids/actions";
+import { getKidsClientKey } from "@/components/kids/kids-client-key";
 import {
   addKidsPlaylistItem,
   KIDS_PLAYLIST_STORAGE_KEY,
@@ -18,10 +20,17 @@ export function KidsPlaylistButton({ item }: { item: KidsPlaylistItem }) {
 
   function toggle() {
     const current = readPlaylist();
+    const nextSaved = !isSaved;
     const next = isSaved ? removeKidsPlaylistItem(current, item.id) : addKidsPlaylistItem(current, item);
     writePlaylist(next);
-    setIsSaved(!isSaved);
+    setIsSaved(nextSaved);
     window.dispatchEvent(new CustomEvent("sontube-playlist-updated"));
+    void recordKidsSignalAction({
+      videoId: item.id,
+      clientKey: getKidsClientKey(),
+      type: "PLAYLIST",
+      active: nextSaved,
+    });
   }
 
   return (

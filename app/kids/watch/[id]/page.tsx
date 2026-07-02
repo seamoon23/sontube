@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getThumbnailUrl } from "@/lib/thumbnails";
 import { buildEmbedUrl } from "@/lib/youtube";
+import { KidsFeedbackButtons } from "@/components/kids/kids-feedback-buttons";
 import { KidsPlaylistButton } from "@/components/kids/kids-playlist-controls";
 
 type WatchPageProps = {
@@ -70,6 +71,7 @@ export default async function KidsWatchPage({ params }: WatchPageProps) {
                 }}
               />
             </div>
+            <KidsFeedbackButtons videoId={video.id} />
           </div>
         </section>
       </div>

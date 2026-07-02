@@ -24,6 +24,16 @@ enum PlayMode {
   ALLOW_CONTINUE
 }
 
+enum KidsSignalType {
+  LIKE
+  REWATCH
+  CURIOUS
+  FUNNY
+  TOO_HARD
+  DISLIKE
+  PLAYLIST
+}
+
 model Video {
   id                  String        @id @default(cuid())
   youtubeVideoId      String        @unique
@@ -43,6 +53,7 @@ model Video {
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   tags                VideoTag[]
+  kidSignals          KidsVideoSignal[]
 }
 
 model Tag {
@@ -69,6 +80,20 @@ model VideoTag {
   tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([videoId, tagId])
+}
+
+model KidsVideoSignal {
+  id        String         @id @default(cuid())
+  videoId   String
+  clientKey String
+  type      KidsSignalType
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  video     Video          @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, clientKey, type])
+  @@index([type])
+  @@index([videoId])
 }
 
 model AppSetting {

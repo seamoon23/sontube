@@ -39,12 +39,18 @@ export default async function AdminDashboardPage() {
 
       <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <h3 className="text-lg font-semibold text-ink">바로가기</h3>
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-4">
           <Link className="rounded-md border border-slate-200 p-4 text-sm font-semibold hover:border-ocean" href="/admin/videos">
             영상 목록
           </Link>
           <Link className="rounded-md border border-slate-200 p-4 text-sm font-semibold hover:border-ocean" href="/admin/tags">
             태그 관리
+          </Link>
+          <Link
+            className="rounded-md border border-slate-200 p-4 text-sm font-semibold hover:border-ocean"
+            href="/admin/insights"
+          >
+            관심 요약
           </Link>
           <Link className="rounded-md border border-slate-200 p-4 text-sm font-semibold hover:border-ocean" href="/kids">
             아이 화면 확인

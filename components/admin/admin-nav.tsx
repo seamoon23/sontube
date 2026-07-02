@@ -6,6 +6,7 @@ const navItems = [
   { href: "/admin/videos", label: "영상 목록" },
   { href: "/admin/videos/new", label: "영상 등록" },
   { href: "/admin/tags", label: "태그 관리" },
+  { href: "/admin/insights", label: "관심 요약" },
 ];
 
 export function AdminNav() {
