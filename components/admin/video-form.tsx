@@ -22,9 +22,11 @@ export type VideoFormInitial = {
   originalUrl: string;
   title: string;
   description: string;
+  searchKeywords: string;
   durationText: string;
   safetyStatus: "PARENT_CHECKED" | "NEEDS_REVIEW" | "HIDDEN";
   isPublished: boolean;
+  isParentRecommended: boolean;
   playMode: "SINGLE_THEN_CLOSE" | "ALLOW_CONTINUE";
   thumbnailType: "YOUTUBE" | "CUSTOM" | "PLACEHOLDER";
   tagIds: string[];
@@ -42,9 +44,11 @@ const defaultValues: VideoClientInput = {
   originalUrl: "",
   title: "",
   description: "",
+  searchKeywords: "",
   durationText: "",
   safetyStatus: "NEEDS_REVIEW",
   isPublished: false,
+  isParentRecommended: false,
   playMode: "SINGLE_THEN_CLOSE",
   thumbnailType: "YOUTUBE",
   quickNewTags: "",
@@ -68,9 +72,11 @@ export function VideoForm({ mode, initial, tags, existingVideos }: VideoFormProp
           originalUrl: initial.originalUrl,
           title: initial.title,
           description: initial.description,
+          searchKeywords: initial.searchKeywords,
           durationText: initial.durationText,
           safetyStatus: initial.safetyStatus,
           isPublished: initial.isPublished,
+          isParentRecommended: initial.isParentRecommended,
           playMode: initial.playMode,
           thumbnailType: initial.thumbnailType,
           quickNewTags: "",
@@ -183,6 +189,21 @@ export function VideoForm({ mode, initial, tags, existingVideos }: VideoFormProp
                 {...register("durationText")}
               />
             </div>
+
+            <div>
+              <label className="text-sm font-semibold text-slate-800" htmlFor="searchKeywords">
+                아이 검색 키워드
+              </label>
+              <input
+                id="searchKeywords"
+                className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ocean focus:ring-2 focus:ring-sky-100"
+                placeholder="예: 고양이, 알파벳, 바다, 과학실험"
+                {...register("searchKeywords")}
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                아이 화면 검색에 쓰이는 보호자 작성 키워드입니다. YouTube 전체 검색과 연결되지 않습니다.
+              </p>
+            </div>
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -220,6 +241,10 @@ export function VideoForm({ mode, initial, tags, existingVideos }: VideoFormProp
           <label className="flex items-center gap-3 self-end rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800">
             <input type="checkbox" className="h-4 w-4 accent-ocean" {...register("isPublished")} />
             아이 화면에 공개
+          </label>
+          <label className="flex items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 md:col-span-3">
+            <input type="checkbox" className="h-4 w-4 accent-coral" {...register("isParentRecommended")} />
+            부모님 최근 추천에 올리기
           </label>
         </div>
       </section>

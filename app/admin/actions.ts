@@ -5,7 +5,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { validateCustomThumbnailFile } from "@/lib/custom-thumbnail";
 import { prisma } from "@/lib/db";
+import { requireAdminSession } from "@/lib/admin-session";
 import { splitTagNames, slugifyTagName } from "@/lib/tags";
 import { buildYouTubeThumbnailUrl, parseYouTubeVideoId } from "@/lib/youtube";
 import { tagFormSchema, videoClientSchema } from "@/lib/validation";
@@ -16,14 +18,9 @@ export type ActionResult = {
 };
 
 const THUMBNAIL_UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "thumbnails");
-const MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024;
-const SUPPORTED_THUMBNAIL_TYPES = new Map([
-  ["image/jpeg", "jpg"],
-  ["image/png", "png"],
-  ["image/webp", "webp"],
-]);
-
 export async function createVideoAction(formData: FormData): Promise<ActionResult> {
+  await requireAdminSession();
+
   const input = readVideoFormData(formData);
   const parsed = videoClientSchema.safeParse(input);
 
@@ -50,6 +47,9 @@ export async function createVideoAction(formData: FormData): Promise<ActionResul
 
   const tagIds = await resolveTagIds(parsed.data.tagIds ?? [], parsed.data.quickNewTags ?? "");
   const thumbnail = await resolveThumbnail(formData, videoIdResult.videoId, parsed.data.thumbnailType);
+  if (!thumbnail.ok) {
+    return { ok: false, message: thumbnail.message };
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.video.create({
@@ -58,12 +58,15 @@ export async function createVideoAction(formData: FormData): Promise<ActionResul
         originalUrl: parsed.data.originalUrl,
         title: parsed.data.title,
         description: emptyToNull(parsed.data.description),
+        searchKeywords: emptyToNull(parsed.data.searchKeywords),
         durationText: emptyToNull(parsed.data.durationText),
-        thumbnailType: thumbnail.thumbnailType,
-        youtubeThumbnailUrl: thumbnail.youtubeThumbnailUrl,
-        customThumbnailPath: thumbnail.customThumbnailPath,
+        thumbnailType: thumbnail.value.thumbnailType,
+        youtubeThumbnailUrl: thumbnail.value.youtubeThumbnailUrl,
+        customThumbnailPath: thumbnail.value.customThumbnailPath,
         safetyStatus: parsed.data.safetyStatus as SafetyStatus,
         isPublished: parsed.data.isPublished,
+        isParentRecommended: parsed.data.isParentRecommended,
+        parentRecommendedAt: parsed.data.isParentRecommended ? new Date() : null,
         playMode: parsed.data.playMode as PlayMode,
         tags: {
           create: tagIds.map((tagId) => ({
@@ -81,6 +84,8 @@ export async function createVideoAction(formData: FormData): Promise<ActionResul
 }
 
 export async function updateVideoAction(videoId: string, formData: FormData): Promise<ActionResult> {
+  await requireAdminSession();
+
   const existing = await prisma.video.findUnique({
     where: { id: videoId },
     include: { tags: true },
@@ -125,6 +130,9 @@ export async function updateVideoAction(videoId: string, formData: FormData): Pr
     parsed.data.thumbnailType,
     existing.customThumbnailPath,
   );
+  if (!thumbnail.ok) {
+    return { ok: false, message: thumbnail.message };
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.video.update({
@@ -134,12 +142,16 @@ export async function updateVideoAction(videoId: string, formData: FormData): Pr
         originalUrl: parsed.data.originalUrl,
         title: parsed.data.title,
         description: emptyToNull(parsed.data.description),
+        searchKeywords: emptyToNull(parsed.data.searchKeywords),
         durationText: emptyToNull(parsed.data.durationText),
-        thumbnailType: thumbnail.thumbnailType,
-        youtubeThumbnailUrl: thumbnail.youtubeThumbnailUrl,
-        customThumbnailPath: thumbnail.customThumbnailPath,
+        thumbnailType: thumbnail.value.thumbnailType,
+        youtubeThumbnailUrl: thumbnail.value.youtubeThumbnailUrl,
+        customThumbnailPath: thumbnail.value.customThumbnailPath,
         safetyStatus: parsed.data.safetyStatus as SafetyStatus,
         isPublished: parsed.data.isPublished,
+        isParentRecommended: parsed.data.isParentRecommended,
+        parentRecommendedAt:
+          parsed.data.isParentRecommended && !existing.isParentRecommended ? new Date() : existing.parentRecommendedAt,
         playMode: parsed.data.playMode as PlayMode,
         tags: {
           deleteMany: {},
@@ -158,6 +170,8 @@ export async function updateVideoAction(videoId: string, formData: FormData): Pr
 }
 
 export async function createTagAction(formData: FormData): Promise<ActionResult> {
+  await requireAdminSession();
+
   const parsed = tagFormSchema.safeParse(readTagFormData(formData));
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? "태그 입력값을 확인해 주세요." };
@@ -187,6 +201,8 @@ export async function createTagAction(formData: FormData): Promise<ActionResult>
 }
 
 export async function updateTagAction(tagId: string, formData: FormData): Promise<ActionResult> {
+  await requireAdminSession();
+
   const parsed = tagFormSchema.safeParse(readTagFormData(formData));
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? "태그 입력값을 확인해 주세요." };
@@ -223,9 +239,11 @@ function readVideoFormData(formData: FormData) {
     originalUrl: String(formData.get("originalUrl") ?? ""),
     title: String(formData.get("title") ?? ""),
     description: String(formData.get("description") ?? ""),
+    searchKeywords: String(formData.get("searchKeywords") ?? ""),
     durationText: String(formData.get("durationText") ?? ""),
     safetyStatus: String(formData.get("safetyStatus") ?? "NEEDS_REVIEW"),
     isPublished: formData.get("isPublished") === "on",
+    isParentRecommended: formData.get("isParentRecommended") === "on",
     playMode: String(formData.get("playMode") ?? "SINGLE_THEN_CLOSE"),
     thumbnailType: String(formData.get("thumbnailType") ?? "YOUTUBE"),
     quickNewTags: String(formData.get("quickNewTags") ?? ""),
@@ -281,9 +299,12 @@ async function resolveThumbnail(
 ) {
   if (requestedType === "PLACEHOLDER") {
     return {
-      thumbnailType: ThumbnailType.PLACEHOLDER,
-      youtubeThumbnailUrl: null,
-      customThumbnailPath: null,
+      ok: true as const,
+      value: {
+        thumbnailType: ThumbnailType.PLACEHOLDER,
+        youtubeThumbnailUrl: null,
+        customThumbnailPath: null,
+      },
     };
   }
 
@@ -291,25 +312,38 @@ async function resolveThumbnail(
     const uploadResult = await saveCustomThumbnail(formData, youtubeVideoId);
     if (uploadResult.ok) {
       return {
-        thumbnailType: ThumbnailType.CUSTOM,
-        youtubeThumbnailUrl: null,
-        customThumbnailPath: uploadResult.path,
+        ok: true as const,
+        value: {
+          thumbnailType: ThumbnailType.CUSTOM,
+          youtubeThumbnailUrl: null,
+          customThumbnailPath: uploadResult.path,
+        },
       };
+    }
+
+    if ("message" in uploadResult) {
+      return uploadResult;
     }
 
     if (existingCustomThumbnailPath) {
       return {
-        thumbnailType: ThumbnailType.CUSTOM,
-        youtubeThumbnailUrl: null,
-        customThumbnailPath: existingCustomThumbnailPath,
+        ok: true as const,
+        value: {
+          thumbnailType: ThumbnailType.CUSTOM,
+          youtubeThumbnailUrl: null,
+          customThumbnailPath: existingCustomThumbnailPath,
+        },
       };
     }
   }
 
   return {
-    thumbnailType: ThumbnailType.YOUTUBE,
-    youtubeThumbnailUrl: buildYouTubeThumbnailUrl(youtubeVideoId),
-    customThumbnailPath: null,
+    ok: true as const,
+    value: {
+      thumbnailType: ThumbnailType.YOUTUBE,
+      youtubeThumbnailUrl: buildYouTubeThumbnailUrl(youtubeVideoId),
+      customThumbnailPath: null,
+    },
   };
 }
 
@@ -320,17 +354,13 @@ async function saveCustomThumbnail(formData: FormData, youtubeVideoId: string) {
     return { ok: false as const };
   }
 
-  if (file.size > MAX_THUMBNAIL_BYTES) {
-    throw new Error("커스텀 썸네일은 2MB 이하 이미지만 업로드할 수 있습니다.");
-  }
-
-  const extension = SUPPORTED_THUMBNAIL_TYPES.get(file.type);
-  if (!extension) {
-    throw new Error("커스텀 썸네일은 JPG, PNG, WEBP 형식만 지원합니다.");
+  const validation = validateCustomThumbnailFile(file);
+  if (!validation.ok) {
+    return validation;
   }
 
   await mkdir(THUMBNAIL_UPLOAD_DIR, { recursive: true });
-  const fileName = `${youtubeVideoId}-${Date.now()}.${extension}`;
+  const fileName = `${youtubeVideoId}-${Date.now()}.${validation.extension}`;
   const filePath = path.join(THUMBNAIL_UPLOAD_DIR, fileName);
   const bytes = Buffer.from(await file.arrayBuffer());
   await writeFile(filePath, bytes);

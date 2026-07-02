@@ -1,12 +1,17 @@
 import { notFound } from "next/navigation";
 import { VideoForm, type VideoFormInitial } from "@/components/admin/video-form";
 import { prisma } from "@/lib/db";
+import { requireAdminSession } from "@/lib/admin-session";
+
+export const dynamic = "force-dynamic";
 
 type EditVideoPageProps = {
   params: Promise<{ id: string }>;
 };
 
 export default async function EditVideoPage({ params }: EditVideoPageProps) {
+  await requireAdminSession();
+
   const { id } = await params;
   const [video, tags, existingVideos] = await Promise.all([
     prisma.video.findUnique({
@@ -32,9 +37,11 @@ export default async function EditVideoPage({ params }: EditVideoPageProps) {
     originalUrl: video.originalUrl,
     title: video.title,
     description: video.description ?? "",
+    searchKeywords: video.searchKeywords ?? "",
     durationText: video.durationText ?? "",
     safetyStatus: video.safetyStatus,
     isPublished: video.isPublished,
+    isParentRecommended: video.isParentRecommended,
     playMode: video.playMode,
     thumbnailType: video.thumbnailType,
     tagIds: video.tags.map(({ tagId }) => tagId),

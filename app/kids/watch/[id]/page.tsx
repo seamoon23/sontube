@@ -2,7 +2,9 @@ import { SafetyStatus } from "@prisma/client";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getThumbnailUrl } from "@/lib/thumbnails";
 import { buildEmbedUrl } from "@/lib/youtube";
+import { KidsPlaylistButton } from "@/components/kids/kids-playlist-controls";
 
 type WatchPageProps = {
   params: Promise<{ id: string }>;
@@ -58,6 +60,16 @@ export default async function KidsWatchPage({ params }: WatchPageProps) {
           <div className="grid gap-2">
             <h1 className="text-2xl font-black md:text-3xl">{video.title}</h1>
             {video.description && <p className="max-w-3xl text-sm leading-6 text-slate-200">{video.description}</p>}
+            <div className="pt-2">
+              <KidsPlaylistButton
+                item={{
+                  id: video.id,
+                  title: video.title,
+                  thumbnailUrl: getThumbnailUrl(video),
+                  durationText: video.durationText,
+                }}
+              />
+            </div>
           </div>
         </section>
       </div>

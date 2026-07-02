@@ -2,6 +2,9 @@ import { Prisma, SafetyStatus } from "@prisma/client";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getThumbnailUrl } from "@/lib/thumbnails";
+import { requireAdminSession } from "@/lib/admin-session";
+
+export const dynamic = "force-dynamic";
 
 type VideosPageProps = {
   searchParams: Promise<{
@@ -12,6 +15,8 @@ type VideosPageProps = {
 };
 
 export default async function AdminVideosPage({ searchParams }: VideosPageProps) {
+  await requireAdminSession();
+
   const params = await searchParams;
   const q = params.q?.trim() ?? "";
   const tagId = params.tag ?? "";
@@ -22,6 +27,7 @@ export default async function AdminVideosPage({ searchParams }: VideosPageProps)
     where.OR = [
       { title: { contains: q } },
       { description: { contains: q } },
+      { searchKeywords: { contains: q } },
       { youtubeVideoId: { contains: q } },
     ];
   }
@@ -127,6 +133,7 @@ export default async function AdminVideosPage({ searchParams }: VideosPageProps)
               <p className="text-sm text-slate-600">
                 {video.safetyStatus === "PARENT_CHECKED" ? "확인 완료" : video.safetyStatus === "HIDDEN" ? "숨김" : "검토 필요"} ·{" "}
                 {video.isPublished ? "공개" : "비공개"} · {video.durationText ?? "시간 미입력"}
+                {video.isParentRecommended ? " · 부모 추천" : ""}
               </p>
             </div>
             <div className="flex items-start justify-end">

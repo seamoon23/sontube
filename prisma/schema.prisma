@@ -30,12 +30,15 @@ model Video {
   originalUrl          String
   title               String
   description         String?
+  searchKeywords      String?
   durationText        String?
   thumbnailType       ThumbnailType @default(YOUTUBE)
   youtubeThumbnailUrl String?
   customThumbnailPath String?
   safetyStatus        SafetyStatus  @default(NEEDS_REVIEW)
   isPublished         Boolean       @default(false)
+  isParentRecommended Boolean       @default(false)
+  parentRecommendedAt DateTime?
   playMode            PlayMode      @default(SINGLE_THEN_CLOSE)
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt

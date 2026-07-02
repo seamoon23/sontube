@@ -1,8 +1,13 @@
 import Link from "next/link";
 import { SafetyStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { requireAdminSession } from "@/lib/admin-session";
+
+export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
+  await requireAdminSession();
+
   const [totalVideos, publishedVideos, reviewVideos, tags] = await Promise.all([
     prisma.video.count(),
     prisma.video.count({ where: { isPublished: true, safetyStatus: SafetyStatus.PARENT_CHECKED } }),

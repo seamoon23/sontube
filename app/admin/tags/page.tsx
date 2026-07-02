@@ -1,7 +1,12 @@
 import { TagManager } from "@/components/admin/tag-manager";
 import { prisma } from "@/lib/db";
+import { requireAdminSession } from "@/lib/admin-session";
+
+export const dynamic = "force-dynamic";
 
 export default async function AdminTagsPage() {
+  await requireAdminSession();
+
   const tags = await prisma.tag.findMany({
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });

@@ -1,7 +1,9 @@
-import { SafetyStatus } from "@prisma/client";
 import Link from "next/link";
+import { KidsPlaylistPanel } from "@/components/kids/kids-playlist-controls";
 import { KidsVideoCard } from "@/components/kids/video-card";
 import { prisma } from "@/lib/db";
+import { buildKidsVideoWhere } from "@/lib/kids-query";
+import { SafetyStatus } from "@prisma/client";
 
 type KidsPageProps = {
   searchParams: Promise<{
@@ -18,29 +20,11 @@ export default async function KidsPage({ searchParams }: KidsPageProps) {
     isPublished: true,
     safetyStatus: SafetyStatus.PARENT_CHECKED,
   };
+  const videoWhere = buildKidsVideoWhere({ q, tagSlug });
 
-  const [videos, hotTags] = await Promise.all([
+  const [videos, recommendedVideos, hotTags] = await Promise.all([
     prisma.video.findMany({
-      where: {
-        ...visibleVideoWhere,
-        ...(q
-          ? {
-              OR: [{ title: { contains: q } }, { description: { contains: q } }],
-            }
-          : {}),
-        ...(tagSlug
-          ? {
-              tags: {
-                some: {
-                  tag: {
-                    slug: tagSlug,
-                    isActive: true,
-                  },
-                },
-              },
-            }
-          : {}),
-      },
+      where: videoWhere,
       include: {
         tags: {
           where: { tag: { isActive: true } },
@@ -49,6 +33,18 @@ export default async function KidsPage({ searchParams }: KidsPageProps) {
         },
       },
       orderBy: { updatedAt: "desc" },
+    }),
+    prisma.video.findMany({
+      where: buildKidsVideoWhere({ parentRecommendedOnly: true }),
+      include: {
+        tags: {
+          where: { tag: { isActive: true } },
+          include: { tag: true },
+          orderBy: { tag: { sortOrder: "asc" } },
+        },
+      },
+      orderBy: [{ parentRecommendedAt: "desc" }, { updatedAt: "desc" }],
+      take: 6,
     }),
     prisma.tag.findMany({
       where: {
@@ -82,7 +78,7 @@ export default async function KidsPage({ searchParams }: KidsPageProps) {
             <input
               name="q"
               defaultValue={q}
-              placeholder="제목 검색"
+              placeholder="제목 또는 부모님 키워드 검색"
               className="rounded-md border border-slate-300 px-4 py-3 text-base outline-none focus:border-ocean focus:ring-2 focus:ring-sky-100"
             />
             {tagSlug && <input type="hidden" name="tag" value={tagSlug} />}
@@ -115,6 +111,21 @@ export default async function KidsPage({ searchParams }: KidsPageProps) {
           )}
         </div>
       </header>
+
+      <KidsPlaylistPanel />
+
+      {recommendedVideos.length > 0 && (
+        <section className="mx-auto grid max-w-6xl gap-4 px-4 pt-6 md:px-8">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-black text-ink">부모님 최근 추천</h2>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {recommendedVideos.map((video) => (
+              <KidsVideoCard key={video.id} video={video} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mx-auto grid max-w-6xl gap-4 px-4 py-6 md:grid-cols-2 md:px-8 lg:grid-cols-3">
         {videos.length === 0 && (

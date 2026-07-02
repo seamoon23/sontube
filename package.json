@@ -12,7 +12,9 @@
     "test:watch": "vitest",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:init": "node scripts/init-db.mjs",
+    "db:seed": "tsx prisma/seed.ts",
+    "auth:hash": "node scripts/hash-admin-password.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",

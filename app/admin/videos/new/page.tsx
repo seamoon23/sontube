@@ -1,7 +1,12 @@
 import { VideoForm } from "@/components/admin/video-form";
 import { prisma } from "@/lib/db";
+import { requireAdminSession } from "@/lib/admin-session";
+
+export const dynamic = "force-dynamic";
 
 export default async function NewVideoPage() {
+  await requireAdminSession();
+
   const [tags, existingVideos] = await Promise.all([
     prisma.tag.findMany({
       where: { isActive: true },
