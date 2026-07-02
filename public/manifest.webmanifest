@@ -1,0 +1,17 @@
+{
+  "name": "SonTube",
+  "short_name": "SonTube",
+  "description": "보호자가 직접 등록한 영상 안에서만 고르는 아이 전용 영상서랍",
+  "start_url": "/kids",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0369a1",
+  "icons": [
+    {
+      "src": "/thumbnail-placeholder.svg",
+      "sizes": "640x360",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum ThumbnailType {
+  YOUTUBE
+  CUSTOM
+  PLACEHOLDER
+}
+
+enum SafetyStatus {
+  PARENT_CHECKED
+  NEEDS_REVIEW
+  HIDDEN
+}
+
+enum PlayMode {
+  SINGLE_THEN_CLOSE
+  ALLOW_CONTINUE
+}
+
+model Video {
+  id                  String        @id @default(cuid())
+  youtubeVideoId      String        @unique
+  originalUrl          String
+  title               String
+  description         String?
+  durationText        String?
+  thumbnailType       ThumbnailType @default(YOUTUBE)
+  youtubeThumbnailUrl String?
+  customThumbnailPath String?
+  safetyStatus        SafetyStatus  @default(NEEDS_REVIEW)
+  isPublished         Boolean       @default(false)
+  playMode            PlayMode      @default(SINGLE_THEN_CLOSE)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  tags                VideoTag[]
+}
+
+model Tag {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  color       String?
+  icon        String?
+  description String?
+  sortOrder   Int        @default(0)
+  isActive    Boolean    @default(true)
+  usageCount  Int        @default(0)
+  lastUsedAt  DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  videos      VideoTag[]
+}
+
+model VideoTag {
+  videoId    String
+  tagId      String
+  assignedAt DateTime @default(now())
+  video      Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([videoId, tagId])
+}
+
+model AppSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

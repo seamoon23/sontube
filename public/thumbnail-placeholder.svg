@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-labelledby="title desc">
+  <title id="title">SonTube placeholder thumbnail</title>
+  <desc id="desc">A simple placeholder image for videos without a custom or YouTube thumbnail.</desc>
+  <rect width="640" height="360" fill="#f8fafc"/>
+  <rect x="28" y="28" width="584" height="304" rx="24" fill="#e0f2fe"/>
+  <circle cx="164" cy="138" r="46" fill="#facc15"/>
+  <path d="M96 282c52-74 92-110 120-108 21 2 40 27 58 44 18 18 34 27 52 13 20-16 42-63 75-62 35 0 76 50 143 113H96z" fill="#4d7c0f"/>
+  <path d="M294 126l108 61-108 61V126z" fill="#17202a" opacity=".86"/>
+</svg>
