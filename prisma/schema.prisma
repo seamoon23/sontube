@@ -97,6 +97,27 @@ model KidsVideoSignal {
   @@index([updatedAt])
 }
 
+model AppAccessKey {
+  id             String    @id @default(cuid())
+  name           String
+  keyHash        String    @unique
+  keyPrefix      String
+  installationId String?
+  isActive       Boolean   @default(true)
+  trialStartedAt DateTime  @default(now())
+  trialEndsAt    DateTime
+  paidUntil      DateTime?
+  lastSyncedAt   DateTime?
+  registeredAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([keyPrefix])
+  @@index([installationId])
+  @@index([trialEndsAt])
+  @@index([paidUntil])
+}
+
 model AppSetting {
   id        String   @id @default(cuid())
   key       String   @unique

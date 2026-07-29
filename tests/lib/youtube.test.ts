@@ -56,7 +56,7 @@ describe("parseYouTubeVideoId", () => {
 describe("YouTube URL builders", () => {
   it("builds iframe and default thumbnail URLs without external API calls", () => {
     expect(buildEmbedUrl("dQw4w9WgXcQ")).toBe(
-      "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0&modestbranding=1",
+      "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0&modestbranding=1&loop=1&playlist=dQw4w9WgXcQ&playsinline=1",
     );
     expect(buildYouTubeThumbnailUrl("dQw4w9WgXcQ")).toBe(
       "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg",

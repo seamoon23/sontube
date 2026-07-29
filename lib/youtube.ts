@@ -105,7 +105,9 @@ export function parseYouTubeVideoId(rawUrl: string): ParseYouTubeVideoIdResult {
 }
 
 export function buildEmbedUrl(videoId: string): string {
-  return `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1`;
+  const params = new URLSearchParams({ rel: "0", modestbranding: "1", loop: "1", playlist: videoId, playsinline: "1" });
+
+  return `https://www.youtube-nocookie.com/embed/${videoId}?${params.toString()}`;
 }
 
 export function buildYouTubeThumbnailUrl(videoId: string, quality = "hqdefault"): string {

@@ -5,7 +5,35 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const dbPath = join(root, "prisma", "dev.db");
+const appAccessKeyStatements = [
+  `CREATE TABLE IF NOT EXISTS "AppAccessKey" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "keyHash" TEXT NOT NULL,
+    "keyPrefix" TEXT NOT NULL,
+    "installationId" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "trialStartedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "trialEndsAt" DATETIME NOT NULL,
+    "paidUntil" DATETIME,
+    "lastSyncedAt" DATETIME,
+    "registeredAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );`,
+  'CREATE UNIQUE INDEX IF NOT EXISTS "AppAccessKey_keyHash_key" ON "AppAccessKey"("keyHash");',
+  'CREATE INDEX IF NOT EXISTS "AppAccessKey_keyPrefix_idx" ON "AppAccessKey"("keyPrefix");',
+  'CREATE INDEX IF NOT EXISTS "AppAccessKey_installationId_idx" ON "AppAccessKey"("installationId");',
+  'CREATE INDEX IF NOT EXISTS "AppAccessKey_trialEndsAt_idx" ON "AppAccessKey"("trialEndsAt");',
+  'CREATE INDEX IF NOT EXISTS "AppAccessKey_paidUntil_idx" ON "AppAccessKey"("paidUntil");',
+];
 
+const appAccessKeyUpgradeStatements = [
+  ...appAccessKeyStatements,
+  'ALTER TABLE "AppAccessKey" ADD COLUMN "installationId" TEXT;',
+  'ALTER TABLE "AppAccessKey" ADD COLUMN "registeredAt" DATETIME;',
+  'CREATE INDEX IF NOT EXISTS "AppAccessKey_installationId_idx" ON "AppAccessKey"("installationId");',
+];
 const first = run("npx", ["prisma", "db", "push"], { stdio: "inherit" });
 if (first.status === 0) {
   process.exit(0);
@@ -32,6 +60,7 @@ if (existsSync(dbPath)) {
     'CREATE INDEX IF NOT EXISTS "KidsVideoSignal_type_idx" ON "KidsVideoSignal"("type");',
     'CREATE INDEX IF NOT EXISTS "KidsVideoSignal_videoId_idx" ON "KidsVideoSignal"("videoId");',
     'CREATE INDEX IF NOT EXISTS "KidsVideoSignal_updatedAt_idx" ON "KidsVideoSignal"("updatedAt");',
+    ...appAccessKeyUpgradeStatements,
   ];
 
   if (applySqlStatements(upgradeStatements, { ignoreDuplicateColumns: true })) {
@@ -99,6 +128,7 @@ const createStatements = [
   'CREATE INDEX IF NOT EXISTS "KidsVideoSignal_type_idx" ON "KidsVideoSignal"("type");',
   'CREATE INDEX IF NOT EXISTS "KidsVideoSignal_videoId_idx" ON "KidsVideoSignal"("videoId");',
   'CREATE INDEX IF NOT EXISTS "KidsVideoSignal_updatedAt_idx" ON "KidsVideoSignal"("updatedAt");',
+  ...appAccessKeyStatements,
   `CREATE TABLE IF NOT EXISTS "AppSetting" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "key" TEXT NOT NULL,

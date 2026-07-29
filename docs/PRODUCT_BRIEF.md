@@ -48,3 +48,13 @@ SonTube는 집 안에서 보는 영상만큼은 보호자가 미리 검토한 �
 - 기간별 관심 변화 차트
 - AI API 직접 연동 분석
 - 정교한 리포트 PDF/CSV export
+
+## 2026-07-24 App Direction Update
+
+- Target buyer/user for account management is the parent.
+- Child-facing app mode is a restricted viewing client, not a general browser entry point.
+- The approved catalog is shared through app-key authenticated JSON sync.
+- Sync cadence is daily by default, with manual refresh from app settings.
+- The child-facing app has no ads; admin web can host a bottom ad/sponsor slot.
+- Trial length is 14 days from app key creation.
+- Payment integration is deferred until store-distribution and policy strategy is chosen.

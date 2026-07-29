@@ -12,7 +12,7 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
   const setupRequired = params.setup === "1" || !isAdminAuthConfigured(process.env);
 
   return (
-    <div className="py-10">
+    <div className="w-full">
       <LoginForm setupRequired={setupRequired} />
     </div>
   );
