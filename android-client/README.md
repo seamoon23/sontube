@@ -10,7 +10,12 @@
 - 새 창, 파일 다운로드, 파일 시스템 접근, 앱 권한 요청과 길게 누르기를 차단합니다.
 - 앱을 다시 열 때 WebView 탐색 기록을 복원하지 않으며 History API로 바뀐 주소도 다시 검사합니다.
 - YouTube iframe 전체 화면 재생은 지원하고, 강제 화면 회전으로 Activity가 다시 만들어지는 동작은 피합니다.
-- 앱 키, 24시간 동기화, 수동 다시 불러오기, 내부 검색, 태그, 재생목록과 피드백은 서버의 `/app` 기능을 그대로 사용합니다.
+- 시작할 때 `/api/app/policy`를 먼저 확인하고, 정책 확인 실패 또는 Wi-Fi 필수 상태의 비 Wi-Fi 연결에서는 실제 목록 대신 로컬 샘플 화면을 표시합니다.
+- 설치 ID를 Android 전용 저장소에 고정하고 해당 설치에 등록된 가족의 Wi-Fi 정책과 승인 목록만 조회합니다.
+- 앱은 시작과 전면 복귀 때마다 카탈로그 버전을 확인하고 버전이 바뀐 경우에만 새 승인 목록을 받습니다.
+- 내부 검색, 태그, 재생목록과 피드백은 서버의 `/app` 기능을 사용하며 수동 다시 불러오기 버튼은 두지 않습니다.
+- 새 앱 키는 서버가 정상 승인한 뒤에만 기존 키와 캐시를 교체합니다.
+- 앱 키와 설치 ID가 다른 백업이나 기기로 복원되지 않도록 cloud backup과 기기 이전을 제외합니다.
 
 ## 중요한 보안 경계
 
@@ -20,6 +25,11 @@
 
 YouTube 재생은 YouTube가 제공하는 iframe입니다. 같은 영상을 반복 재생하도록 설정해 종료 추천 노출을 줄이고 iframe의 최상위 이동을 차단하지만, 플레이어 내부 광고와 YouTube가 표시하는 요소를 SonTube가 제거하거나 완전히 통제할 수는 없습니다.
 
+현재 런처 아이콘은 배포 누락을 막기 위한 코드형 기본 아이콘입니다. 스토어 공개 전에 최종 브랜드 아이콘으로 교체해야 합니다.
+
+## 부모 통신 정책
+
+부모 관리자 브라우저에서 `관리자 화면 > 대시보드 > 앱 접속 정책`으로 이동합니다. `Wi-Fi 연결 필수`를 켜면 Android 앱은 Wi-Fi에서만 승인 목록을 확인하고, 끄면 모바일 데이터도 허용합니다. 정책 API에 닿지 못하면 기본값은 `true`이며 실제 승인 목록과 YouTube 플레이어 대신 재생되지 않는 샘플 카드만 표시합니다.
 ## Android Studio에서 실행
 
 1. PC의 `C:\codex\app\sontube`에서 `npm run dev:lan`을 실행합니다.
@@ -30,6 +40,8 @@ YouTube 재생은 YouTube가 제공하는 iframe입니다. 같은 영상을 반�
 6. `Run > Run 'app'`을 선택합니다.
 
 이 프로젝트는 Android API 36, Android Gradle Plugin 8.13.2, Gradle 8.13, JDK 17 기준입니다.
+
+상세 실행 경로, 에뮬레이터 검증 결과와 실제 기기 기록표는 `docs/ANDROID_QA_CHECKLIST.md`를 사용하세요.
 
 ## 서버 주소
 
@@ -60,13 +72,15 @@ $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
 .\gradlew.bat assembleRelease -PSONTUBE_RELEASE_APP_URL=https://family.example.com/app
 ```
 
-실제 배포 전에는 앱 서명, 아이콘, 개인정보 처리방침, 결제 정책과 실제 기기 검증이 추가로 필요합니다.
+실제 배포 전에는 앱 서명, 최종 브랜드 아이콘, 개인정보 처리방침, 결제 정책과 실제 기기 검증이 추가로 필요합니다.
 
-## URL 정책 테스트
+## Android 정책 테스트
 
-Android SDK 없이도 순수 Java 정책 테스트를 실행할 수 있습니다.
+Android SDK 없이 JDK 17만으로 URL, WebView 오류 상태, 시작 통신 정책과 실행 중 네트워크 전환 테스트를 모두 실행할 수 있습니다. PowerShell에서 프로젝트 루트로 이동한 뒤 실행합니다.
 
 ```powershell
-javac -d C:\tmp\sontube-nav-test android-client\app\src\main\java\com\sontube\client\NavigationPolicy.java android-client\tools\NavigationPolicySmokeTest.java
-java -cp C:\tmp\sontube-nav-test com.sontube.client.NavigationPolicySmokeTest
+cd C:\codex\app\sontube
+npm run verify:android:logic
 ```
+
+명령은 임시 컴파일 폴더를 성공·실패와 관계없이 정리합니다. 같은 검증은 `.github\workflows\android-logic-ci.yml`에서도 실행됩니다.

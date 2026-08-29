@@ -1,8 +1,11 @@
 import { Prisma, SafetyStatus, ThumbnailType } from "@prisma/client";
 
+export const UNASSIGNED_CHANNEL_FILTER = "__unassigned";
+
 export type AdminVideoFilterInput = {
   q?: string;
   tagId?: string;
+  channelId?: string;
   status?: string;
   recommended?: string;
   thumbnail?: string;
@@ -18,11 +21,18 @@ export function buildAdminVideoWhere(input: AdminVideoFilterInput): Prisma.Video
       { description: { contains: q } },
       { searchKeywords: { contains: q } },
       { youtubeVideoId: { contains: q } },
+      { channel: { displayName: { contains: q } } },
     ];
   }
 
   if (input.tagId) {
     where.tags = { some: { tagId: input.tagId } };
+  }
+
+  if (input.channelId === UNASSIGNED_CHANNEL_FILTER) {
+    where.channelId = null;
+  } else if (input.channelId) {
+    where.channelId = input.channelId;
   }
 
   if (input.status === "published") {

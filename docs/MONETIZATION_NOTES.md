@@ -9,16 +9,16 @@ The target buyer is the parent. The app is not positioned as a Kids Category app
 - Free trial is 14 days from app key creation.
 - Child-facing app has no ads.
 - Admin web may show a simple bottom ad/sponsor slot.
-- Payment is not implemented in the MVP.
+- Parent web now supports prepaid bank-transfer applications with manual owner approval; there is no card, PG, recurring, or automatic renewal flow.
 - App screens should not link directly to an external checkout until store policy is reviewed for the target distribution channel.
 
-## Payment Direction To Evaluate
+## Implemented Manual Payment Direction
 
-A practical later model is:
+The current initial model is:
 
 1. Parent creates or logs into a web admin account.
-2. Parent pays on the web admin site if the distribution channel allows it.
-3. The server stores entitlement on the account/app key, such as `paidUntil`.
+2. Parent selects a 90-day or 365-day pass and transfers the exact amount to the configured business account.
+3. The owner confirms the actual deposit in the separate superadmin console; the server transaction creates or extends the family subscription and mirrors `paidUntil` to its app keys.
 4. The app sync API returns only entitlement state and approved catalog data.
 5. The child-facing app never shows checkout UI.
 

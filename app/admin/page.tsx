@@ -2,30 +2,39 @@ import Link from "next/link";
 import { SafetyStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireAdminSession } from "@/lib/admin-session";
+import { updateWifiRequiredAction } from "@/app/admin/settings-actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
-  await requireAdminSession();
+  const session = await requireAdminSession();
+  const familyWhere = { familyId: session.familyId };
 
-  const [totalVideos, publishedVideos, reviewVideos, tags] = await Promise.all([
-    prisma.video.count(),
-    prisma.video.count({ where: { isPublished: true, safetyStatus: SafetyStatus.PARENT_CHECKED } }),
-    prisma.video.count({ where: { safetyStatus: SafetyStatus.NEEDS_REVIEW } }),
-    prisma.tag.count({ where: { isActive: true } }),
+  const [totalVideos, publishedVideos, reviewVideos, tags, family] = await Promise.all([
+    prisma.video.count({ where: familyWhere }),
+    prisma.video.count({
+      where: { ...familyWhere, isPublished: true, safetyStatus: SafetyStatus.PARENT_CHECKED },
+    }),
+    prisma.video.count({ where: { ...familyWhere, safetyStatus: SafetyStatus.NEEDS_REVIEW } }),
+    prisma.tag.count({ where: { ...familyWhere, isActive: true } }),
+    prisma.family.findUniqueOrThrow({
+      where: { id: session.familyId },
+      include: { subscription: true },
+    }),
   ]);
+
+  const subscriptionActive =
+    family.subscription?.status === "ACTIVE" && family.subscription.expiresAt > new Date();
 
   return (
     <div className="grid gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-ocean">대시보드</p>
+          <p className="text-sm font-semibold text-ocean">{family.name}</p>
           <h2 className="text-2xl font-bold text-ink">오늘의 관리 상태</h2>
+          <p className="mt-1 text-sm text-slate-600">{session.displayName}님 계정으로 관리 중입니다.</p>
         </div>
-        <Link
-          href="/admin/videos/new"
-          className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
-        >
+        <Link href="/admin/videos/new" className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
           영상 등록
         </Link>
       </div>
@@ -37,24 +46,52 @@ export default async function AdminDashboardPage() {
         <Metric label="활성 태그" value={tags} tone="bg-green-50" />
       </section>
 
+      <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-[1fr_auto] md:items-center">
+        <div>
+          <p className="text-xs font-bold text-ocean">이용권</p>
+          <h3 className="mt-1 text-lg font-semibold text-ink">
+            {subscriptionActive ? "SonTube 이용 중" : "이용권 확인 필요"}
+          </h3>
+          <p className="mt-1 text-sm text-slate-600">
+            {subscriptionActive && family.subscription
+              ? `${formatDate(family.subscription.expiresAt)}까지 사용할 수 있습니다.`
+              : "입금 신청과 처리 상태를 결제 안내에서 확인할 수 있습니다."}
+          </p>
+        </div>
+        <Link href="/admin/payment" className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-ocean hover:text-ocean">
+          이용권·결제 보기
+        </Link>
+      </section>
+
+      <form action={updateWifiRequiredAction} className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div>
+          <p className="text-xs font-bold text-ocean">대시보드 &gt; 앱 접속 정책</p>
+          <h3 className="mt-1 text-lg font-semibold text-ink">승인 목록 통신 환경</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            켜면 Android 앱은 시작할 때 이 설정을 먼저 확인하고 Wi-Fi에서만 승인 목록을 확인합니다. 설정을 확인할 수 없거나
+            Wi-Fi가 아니면 실제 목록 대신 재생되지 않는 샘플 화면을 보여줍니다.
+          </p>
+        </div>
+        <label className="flex items-start gap-3 rounded-md bg-slate-50 p-4 text-sm text-slate-700">
+          <input type="checkbox" name="wifiRequired" defaultChecked={family.wifiRequired} className="mt-1 h-4 w-4 rounded border-slate-300 text-ocean focus:ring-ocean" />
+          <span>
+            <strong className="block text-ink">Wi-Fi 연결 필수</strong>
+            끄면 Wi-Fi와 모바일 데이터 모두에서 새 승인 목록을 받을 수 있습니다.
+          </span>
+        </label>
+        <div>
+          <button type="submit" className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">정책 저장</button>
+        </div>
+      </form>
+
       <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <h3 className="text-lg font-semibold text-ink">바로가기</h3>
-        <div className="grid gap-3 md:grid-cols-4">
-          <Link className="rounded-md border border-slate-200 p-4 text-sm font-semibold hover:border-ocean" href="/admin/videos">
-            영상 목록
-          </Link>
-          <Link className="rounded-md border border-slate-200 p-4 text-sm font-semibold hover:border-ocean" href="/admin/tags">
-            태그 관리
-          </Link>
-          <Link
-            className="rounded-md border border-slate-200 p-4 text-sm font-semibold hover:border-ocean"
-            href="/admin/insights"
-          >
-            관심 요약
-          </Link>
-          <Link className="rounded-md border border-slate-200 p-4 text-sm font-semibold hover:border-ocean" href="/kids">
-            아이 화면 확인
-          </Link>
+        <div className="grid gap-3 md:grid-cols-5">
+          <Link className="rounded-md border border-slate-200 p-4 text-sm font-semibold hover:border-ocean" href="/admin/videos">영상 목록</Link>
+          <Link className="rounded-md border border-slate-200 p-4 text-sm font-semibold hover:border-ocean" href="/admin/tags">태그 관리</Link>
+          <Link className="rounded-md border border-slate-200 p-4 text-sm font-semibold hover:border-ocean" href="/admin/insights">관심 요약</Link>
+          <Link className="rounded-md border border-slate-200 p-4 text-sm font-semibold hover:border-ocean" href="/admin/app-keys">앱 키</Link>
+          <Link className="rounded-md border border-slate-200 p-4 text-sm font-semibold hover:border-ocean" href="/kids">아이 화면 확인</Link>
         </div>
       </section>
     </div>
@@ -68,4 +105,8 @@ function Metric({ label, value, tone }: { label: string; value: number; tone: st
       <p className="mt-2 text-3xl font-bold text-ink">{value}</p>
     </div>
   );
+}
+
+function formatDate(value: Date): string {
+  return new Intl.DateTimeFormat("ko-KR", { dateStyle: "long" }).format(value);
 }

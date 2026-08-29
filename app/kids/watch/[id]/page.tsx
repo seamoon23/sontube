@@ -6,16 +6,19 @@ import { getThumbnailUrl } from "@/lib/thumbnails";
 import { buildEmbedUrl } from "@/lib/youtube";
 import { KidsFeedbackButtons } from "@/components/kids/kids-feedback-buttons";
 import { KidsPlaylistButton } from "@/components/kids/kids-playlist-controls";
+import { requireAdminSession } from "@/lib/admin-session";
 
 type WatchPageProps = {
   params: Promise<{ id: string }>;
 };
 
 export default async function KidsWatchPage({ params }: WatchPageProps) {
+  const session = await requireAdminSession();
   const { id } = await params;
   const video = await prisma.video.findFirst({
     where: {
       id,
+      familyId: session.familyId,
       isPublished: true,
       safetyStatus: SafetyStatus.PARENT_CHECKED,
     },

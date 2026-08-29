@@ -27,17 +27,16 @@ const periodOptions = [
 ];
 
 export default async function AdminKidsInsightsPage({ searchParams }: AdminKidsInsightsPageProps) {
-  await requireAdminSession();
+  const session = await requireAdminSession();
 
   const params = await searchParams;
   const period = getKidsInsightPeriod(params.period);
 
   const signals = await prisma.kidsVideoSignal.findMany({
-    where: period.since
-      ? {
-          updatedAt: { gte: period.since },
-        }
-      : undefined,
+    where: {
+      video: { familyId: session.familyId },
+      ...(period.since ? { updatedAt: { gte: period.since } } : {}),
+    },
     include: {
       video: {
         include: {

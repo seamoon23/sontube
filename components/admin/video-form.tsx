@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { createVideoAction, updateVideoAction, type ActionResult } from "@/app/admin/actions";
+import { MAX_CHANNEL_DISPLAY_NAME_LENGTH } from "@/lib/channels";
 import { recommendTags, type RecommendationTag, type RecommendationVideo } from "@/lib/tag-recommendations";
 import { buildYouTubeThumbnailUrl, parseYouTubeVideoId } from "@/lib/youtube";
 import { videoClientSchema, type VideoClientInput } from "@/lib/validation";
@@ -17,6 +18,12 @@ export type VideoFormVideo = Omit<RecommendationVideo, "tags"> & {
   tags: RecommendationTag[];
 };
 
+export type VideoFormChannel = {
+  id: string;
+  displayName: string;
+  isActive: boolean;
+};
+
 export type VideoFormInitial = {
   id: string;
   originalUrl: string;
@@ -24,6 +31,7 @@ export type VideoFormInitial = {
   description: string;
   searchKeywords: string;
   durationText: string;
+  channelId: string | null;
   safetyStatus: "PARENT_CHECKED" | "NEEDS_REVIEW" | "HIDDEN";
   isPublished: boolean;
   isParentRecommended: boolean;
@@ -37,6 +45,7 @@ type VideoFormProps = {
   mode: "create" | "edit";
   initial?: VideoFormInitial;
   tags: VideoFormTag[];
+  channels: VideoFormChannel[];
   existingVideos: VideoFormVideo[];
 };
 
@@ -46,6 +55,9 @@ const defaultValues: VideoClientInput = {
   description: "",
   searchKeywords: "",
   durationText: "",
+  channelMode: "NONE",
+  channelId: "",
+  newChannelName: "",
   safetyStatus: "NEEDS_REVIEW",
   isPublished: false,
   isParentRecommended: false,
@@ -55,7 +67,7 @@ const defaultValues: VideoClientInput = {
   tagIds: [],
 };
 
-export function VideoForm({ mode, initial, tags, existingVideos }: VideoFormProps) {
+export function VideoForm({ mode, initial, tags, channels, existingVideos }: VideoFormProps) {
   const [result, setResult] = useState<ActionResult | null>(null);
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
@@ -74,6 +86,9 @@ export function VideoForm({ mode, initial, tags, existingVideos }: VideoFormProp
           description: initial.description,
           searchKeywords: initial.searchKeywords,
           durationText: initial.durationText,
+          channelMode: initial.channelId ? "EXISTING" : "NONE",
+          channelId: initial.channelId ?? "",
+          newChannelName: "",
           safetyStatus: initial.safetyStatus,
           isPublished: initial.isPublished,
           isParentRecommended: initial.isParentRecommended,
@@ -88,6 +103,7 @@ export function VideoForm({ mode, initial, tags, existingVideos }: VideoFormProp
   const watchedUrl = watch("originalUrl");
   const watchedTitle = watch("title");
   const watchedDescription = watch("description");
+  const channelMode = watch("channelMode");
   const watchedTagIds = watch("tagIds");
   const selectedTagIds = useMemo(() => watchedTagIds ?? [], [watchedTagIds]);
   const thumbnailType = watch("thumbnailType");
@@ -216,6 +232,84 @@ export function VideoForm({ mode, initial, tags, existingVideos }: VideoFormProp
             <p className="mt-2 text-xs text-slate-500">썸네일 미리보기</p>
           </div>
         </div>
+      </section>
+
+      <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div>
+          <h2 className="text-base font-semibold text-ink">채널(제작자)</h2>
+          <p id="channel-help" className="mt-1 text-xs leading-5 text-slate-500">
+            같은 채널로 등록한 승인 영상끼리 묶어 보여줍니다. YouTube 채널의 다른 영상은 자동으로 가져오지 않습니다.
+          </p>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3" role="radiogroup" aria-describedby="channel-help">
+          <label className="flex cursor-pointer items-start gap-3 rounded-md border border-slate-200 p-3 text-sm text-slate-800">
+            <input type="radio" value="NONE" className="mt-0.5 accent-ocean" {...register("channelMode")} />
+            <span>
+              <span className="block font-semibold">채널 미지정</span>
+              <span className="mt-1 block text-xs text-slate-500">나중에 채널을 연결할 수 있습니다.</span>
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3 rounded-md border border-slate-200 p-3 text-sm text-slate-800">
+            <input type="radio" value="EXISTING" className="mt-0.5 accent-ocean" {...register("channelMode")} />
+            <span>
+              <span className="block font-semibold">기존 채널 선택</span>
+              <span className="mt-1 block text-xs text-slate-500">이미 등록된 채널에 영상을 추가합니다.</span>
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3 rounded-md border border-slate-200 p-3 text-sm text-slate-800">
+            <input type="radio" value="NEW" className="mt-0.5 accent-ocean" {...register("channelMode")} />
+            <span>
+              <span className="block font-semibold">새 채널 입력</span>
+              <span className="mt-1 block text-xs text-slate-500">새 이름을 등록하고 이 영상에 연결합니다.</span>
+            </span>
+          </label>
+        </div>
+
+        {channelMode === "EXISTING" && (
+          <label className="grid gap-2 text-sm font-medium text-slate-800" htmlFor="channelId">
+            기존 채널
+            <select
+              id="channelId"
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              {...register("channelId")}
+            >
+              <option value="">채널을 선택해 주세요</option>
+              {channels.map((channel) => (
+                <option
+                  key={channel.id}
+                  value={channel.id}
+                  disabled={!channel.isActive && channel.id !== initial?.channelId}
+                >
+                  {channel.displayName}{channel.isActive ? "" : " (사용 중지)"}
+                </option>
+              ))}
+            </select>
+            {channels.length === 0 && (
+              <span className="text-xs font-normal text-slate-500">등록된 채널이 없습니다. 새 채널 입력을 선택해 주세요.</span>
+            )}
+            {errors.channelId && <span className="text-sm font-normal text-red-700">{errors.channelId.message}</span>}
+          </label>
+        )}
+
+        {channelMode === "NEW" && (
+          <label className="grid gap-2 text-sm font-medium text-slate-800" htmlFor="newChannelName">
+            새 채널명
+            <input
+              id="newChannelName"
+              maxLength={MAX_CHANNEL_DISPLAY_NAME_LENGTH}
+              placeholder="예: 우리집 과학교실"
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              {...register("newChannelName")}
+            />
+            <span className="text-xs font-normal text-slate-500">
+              띄어쓰기와 대소문자만 다른 기존 채널이 있으면 그 채널에 연결됩니다.
+            </span>
+            {errors.newChannelName && (
+              <span className="text-sm font-normal text-red-700">{errors.newChannelName.message}</span>
+            )}
+          </label>
+        )}
       </section>
 
       <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">

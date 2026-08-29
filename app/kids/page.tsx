@@ -4,6 +4,7 @@ import { KidsVideoCard } from "@/components/kids/video-card";
 import { prisma } from "@/lib/db";
 import { buildKidsVideoWhere } from "@/lib/kids-query";
 import { SafetyStatus } from "@prisma/client";
+import { requireAdminSession } from "@/lib/admin-session";
 
 type KidsPageProps = {
   searchParams: Promise<{
@@ -13,14 +14,16 @@ type KidsPageProps = {
 };
 
 export default async function KidsPage({ searchParams }: KidsPageProps) {
+  const session = await requireAdminSession();
   const params = await searchParams;
   const q = params.q?.trim() ?? "";
   const tagSlug = params.tag ?? "";
   const visibleVideoWhere = {
+    familyId: session.familyId,
     isPublished: true,
     safetyStatus: SafetyStatus.PARENT_CHECKED,
   };
-  const videoWhere = buildKidsVideoWhere({ q, tagSlug });
+  const videoWhere = { familyId: session.familyId, ...buildKidsVideoWhere({ q, tagSlug }) };
 
   const [videos, recommendedVideos, hotTags] = await Promise.all([
     prisma.video.findMany({
@@ -35,7 +38,7 @@ export default async function KidsPage({ searchParams }: KidsPageProps) {
       orderBy: { updatedAt: "desc" },
     }),
     prisma.video.findMany({
-      where: buildKidsVideoWhere({ parentRecommendedOnly: true }),
+      where: { familyId: session.familyId, ...buildKidsVideoWhere({ parentRecommendedOnly: true }) },
       include: {
         tags: {
           where: { tag: { isActive: true } },
@@ -48,6 +51,7 @@ export default async function KidsPage({ searchParams }: KidsPageProps) {
     }),
     prisma.tag.findMany({
       where: {
+        familyId: session.familyId,
         isActive: true,
         videos: {
           some: {

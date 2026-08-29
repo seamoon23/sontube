@@ -5,9 +5,10 @@ import { requireAdminSession } from "@/lib/admin-session";
 export const dynamic = "force-dynamic";
 
 export default async function AdminTagsPage() {
-  await requireAdminSession();
+  const session = await requireAdminSession();
 
   const tags = await prisma.tag.findMany({
+    where: { familyId: session.familyId },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
 

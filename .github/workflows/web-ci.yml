@@ -1,0 +1,40 @@
+name: Web CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify web application
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+      SESSION_SECRET: ci-only-parent-session-secret-do-not-use-in-production
+      SUPERADMIN_LOGIN_ID: ci-owner
+      SUPERADMIN_SESSION_SECRET: ci-only-superadmin-session-secret-do-not-use-in-production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify web application
+        run: npm run verify:web

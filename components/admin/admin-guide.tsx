@@ -40,7 +40,7 @@ const guides = {
         description: "검색과 필터는 내부에 저장된 영상만 대상으로 합니다.",
         steps: [
           "제목이나 보호자가 입력한 검색 키워드로 찾을 수 있습니다.",
-          "태그, 안전 상태, 부모 추천, 썸네일 종류를 함께 좁힐 수 있습니다.",
+          "태그, 채널, 안전 상태, 부모 추천, 썸네일 종류를 함께 좁힐 수 있습니다.",
         ],
       },
       {
@@ -87,6 +87,28 @@ const guides = {
         steps: [
           "부모 추천은 최근에 함께 보고 싶은 영상에만 켜 두는 편이 좋습니다.",
           "저장 전 안전 확인 상태와 공개 여부를 마지막으로 확인하세요.",
+        ],
+      },
+    ],
+  },
+  channels: {
+    key: "channels",
+    title: "채널 목록 사용 안내",
+    slides: [
+      {
+        title: "직접 등록한 채널만 모아 봅니다",
+        description: "채널은 보호자가 한 편씩 등록한 영상을 내부에서 묶는 분류입니다.",
+        steps: [
+          "YouTube 채널의 다른 영상은 자동으로 수집하거나 표시하지 않습니다.",
+          "채널별 등록 영상 수와 아이에게 공개된 승인 영상 수를 비교할 수 있습니다.",
+        ],
+      },
+      {
+        title: "채널 영상으로 바로 이동하세요",
+        description: "이 채널 영상 보기는 영상 목록의 채널 필터로 연결됩니다.",
+        steps: [
+          "새 영상 등록 화면에서 기존 채널을 선택하거나 새 채널명을 입력하세요.",
+          "아이 앱은 같은 채널 중 승인·공개된 영상만 묶어 보여줍니다.",
         ],
       },
     ],
@@ -160,7 +182,7 @@ const guides = {
         description: "키를 등록한 기기는 보호자가 승인한 영상만 내려받습니다.",
         steps: [
           "기본 자동 동기화 간격은 1일입니다.",
-          "바로 반영하려면 앱 설정의 다시 불러오기를 누르세요.",
+          "앱은 시작하거나 다시 전면으로 돌아올 때 목록 버전을 자동으로 확인합니다.",
         ],
       },
       {
@@ -187,12 +209,12 @@ function getGuide(pathname: string): AdminGuide {
   if (pathname === "/admin") return guides.dashboard;
   if (pathname === "/admin/videos/new" || /^\/admin\/videos\/[^/]+\/edit$/.test(pathname)) return guides.videoForm;
   if (pathname.startsWith("/admin/videos")) return guides.videoList;
+  if (pathname.startsWith("/admin/channels")) return guides.channels;
   if (pathname.startsWith("/admin/tags")) return guides.tags;
   if (pathname.startsWith("/admin/insights")) return guides.insights;
   if (pathname.startsWith("/admin/app-keys")) return guides.appKeys;
   return guides.dashboard;
 }
-
 export function AdminGuideButton() {
   const pathname = usePathname();
   const guide = useMemo(() => getGuide(pathname), [pathname]);

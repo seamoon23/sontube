@@ -4,12 +4,16 @@ import { KidsSignalType as PrismaKidsSignalType, SafetyStatus } from "@prisma/cl
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { isKidsSignalType } from "@/lib/kids-signals";
+import { getAppAccessState, hashAppAccessKey, normalizeAppAccessKey } from "@/lib/app-access";
+import { requireAdminSession } from "@/lib/admin-session";
 
 export type KidsSignalActionInput = {
   videoId: string;
   clientKey: string;
   type: string;
   active?: boolean;
+  appKey?: string;
+  installationId?: string;
 };
 
 export async function recordKidsSignalAction(input: KidsSignalActionInput) {
@@ -21,9 +25,15 @@ export async function recordKidsSignalAction(input: KidsSignalActionInput) {
     return { ok: false, message: "반응을 저장하지 못했습니다." };
   }
 
+  const familyId = await resolveSignalFamilyId(input);
+  if (!familyId) {
+    return { ok: false, message: "앱 등록 상태를 확인해 주세요." };
+  }
+
   const video = await prisma.video.findFirst({
     where: {
       id: videoId,
+      familyId,
       isPublished: true,
       safetyStatus: SafetyStatus.PARENT_CHECKED,
     },
@@ -62,4 +72,28 @@ export async function recordKidsSignalAction(input: KidsSignalActionInput) {
 
   revalidatePath("/admin/insights");
   return { ok: true, message: "저장했습니다." };
+}
+
+async function resolveSignalFamilyId(input: KidsSignalActionInput): Promise<string | null> {
+  const appKey = normalizeAppAccessKey(String(input.appKey ?? ""));
+  const installationId = String(input.installationId ?? "").trim();
+
+  if (appKey && installationId) {
+    const accessKey = await prisma.appAccessKey.findUnique({
+      where: { keyHash: hashAppAccessKey(appKey) },
+      include: { family: { select: { isActive: true } } },
+    });
+    if (
+      accessKey?.familyId &&
+      accessKey.family?.isActive &&
+      accessKey.installationId === installationId &&
+      getAppAccessState(accessKey).canSync
+    ) {
+      return accessKey.familyId;
+    }
+    return null;
+  }
+
+  const session = await requireAdminSession();
+  return session.familyId;
 }

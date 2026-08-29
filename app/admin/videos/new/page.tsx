@@ -5,17 +5,23 @@ import { requireAdminSession } from "@/lib/admin-session";
 export const dynamic = "force-dynamic";
 
 export default async function NewVideoPage() {
-  await requireAdminSession();
+  const session = await requireAdminSession();
 
-  const [tags, existingVideos] = await Promise.all([
+  const [tags, existingVideos, channels] = await Promise.all([
     prisma.tag.findMany({
-      where: { isActive: true },
+      where: { familyId: session.familyId, isActive: true },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
     prisma.video.findMany({
+      where: { familyId: session.familyId },
       include: { tags: { include: { tag: true } } },
       orderBy: { updatedAt: "desc" },
       take: 100,
+    }),
+    prisma.channel.findMany({
+      where: { familyId: session.familyId, isActive: true },
+      orderBy: { displayName: "asc" },
+      select: { id: true, displayName: true, isActive: true },
     }),
   ]);
 
@@ -28,6 +34,7 @@ export default async function NewVideoPage() {
       <VideoForm
         mode="create"
         tags={tags.map(serializeTag)}
+        channels={channels}
         existingVideos={existingVideos.map((video) => ({
           id: video.id,
           title: video.title,

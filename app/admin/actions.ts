@@ -5,6 +5,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import {
+  cleanChannelDisplayName,
+  MAX_CHANNEL_DISPLAY_NAME_LENGTH,
+  normalizeChannelName,
+} from "@/lib/channels";
 import { resolveManagedCustomThumbnailPath, validateCustomThumbnailFile } from "@/lib/custom-thumbnail";
 import { prisma } from "@/lib/db";
 import { requireAdminSession } from "@/lib/admin-session";
@@ -19,7 +24,7 @@ export type ActionResult = {
 
 const THUMBNAIL_UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "thumbnails");
 export async function createVideoAction(formData: FormData): Promise<ActionResult> {
-  await requireAdminSession();
+  const session = await requireAdminSession();
 
   const input = readVideoFormData(formData);
   const parsed = videoClientSchema.safeParse(input);
@@ -34,7 +39,12 @@ export async function createVideoAction(formData: FormData): Promise<ActionResul
   }
 
   const duplicate = await prisma.video.findUnique({
-    where: { youtubeVideoId: videoIdResult.videoId },
+    where: {
+      familyId_youtubeVideoId: {
+        familyId: session.familyId,
+        youtubeVideoId: videoIdResult.videoId,
+      },
+    },
     select: { id: true, title: true },
   });
 
@@ -45,18 +55,29 @@ export async function createVideoAction(formData: FormData): Promise<ActionResul
     };
   }
 
-  const tagIds = await resolveTagIds(parsed.data.tagIds ?? [], parsed.data.quickNewTags ?? "");
+  const tagIds = await resolveTagIds(session.familyId, parsed.data.tagIds ?? [], parsed.data.quickNewTags ?? "");
   const thumbnail = await resolveThumbnail(formData, videoIdResult.videoId, parsed.data.thumbnailType);
   if (!thumbnail.ok) {
     return { ok: false, message: thumbnail.message };
+  }
+  const channel = await resolveChannelId(
+    session.familyId,
+    parsed.data.channelMode,
+    parsed.data.channelId,
+    parsed.data.newChannelName,
+  );
+  if (!channel.ok) {
+    return { ok: false, message: channel.message };
   }
 
   await prisma.$transaction(async (tx) => {
     await tx.video.create({
       data: {
+        familyId: session.familyId,
         youtubeVideoId: videoIdResult.videoId,
         originalUrl: parsed.data.originalUrl,
         title: parsed.data.title,
+        channelId: channel.channelId,
         description: emptyToNull(parsed.data.description),
         searchKeywords: emptyToNull(parsed.data.searchKeywords),
         durationText: emptyToNull(parsed.data.durationText),
@@ -84,10 +105,10 @@ export async function createVideoAction(formData: FormData): Promise<ActionResul
 }
 
 export async function updateVideoAction(videoId: string, formData: FormData): Promise<ActionResult> {
-  await requireAdminSession();
+  const session = await requireAdminSession();
 
-  const existing = await prisma.video.findUnique({
-    where: { id: videoId },
+  const existing = await prisma.video.findFirst({
+    where: { id: videoId, familyId: session.familyId },
     include: { tags: true },
   });
 
@@ -109,6 +130,7 @@ export async function updateVideoAction(videoId: string, formData: FormData): Pr
 
   const duplicate = await prisma.video.findFirst({
     where: {
+      familyId: session.familyId,
       youtubeVideoId: videoIdResult.videoId,
       id: { not: videoId },
     },
@@ -123,7 +145,7 @@ export async function updateVideoAction(videoId: string, formData: FormData): Pr
   }
 
   const previousTagIds = existing.tags.map((tag) => tag.tagId);
-  const tagIds = await resolveTagIds(parsed.data.tagIds ?? [], parsed.data.quickNewTags ?? "");
+  const tagIds = await resolveTagIds(session.familyId, parsed.data.tagIds ?? [], parsed.data.quickNewTags ?? "");
   const previousCustomThumbnailPath = existing.customThumbnailPath;
   const thumbnail = await resolveThumbnail(
     formData,
@@ -134,14 +156,25 @@ export async function updateVideoAction(videoId: string, formData: FormData): Pr
   if (!thumbnail.ok) {
     return { ok: false, message: thumbnail.message };
   }
+  const channel = await resolveChannelId(
+    session.familyId,
+    parsed.data.channelMode,
+    parsed.data.channelId,
+    parsed.data.newChannelName,
+  );
+  if (!channel.ok) {
+    return { ok: false, message: channel.message };
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.video.update({
       where: { id: videoId },
       data: {
+        familyId: session.familyId,
         youtubeVideoId: videoIdResult.videoId,
         originalUrl: parsed.data.originalUrl,
         title: parsed.data.title,
+        channelId: channel.channelId,
         description: emptyToNull(parsed.data.description),
         searchKeywords: emptyToNull(parsed.data.searchKeywords),
         durationText: emptyToNull(parsed.data.durationText),
@@ -175,7 +208,7 @@ export async function updateVideoAction(videoId: string, formData: FormData): Pr
 }
 
 export async function createTagAction(formData: FormData): Promise<ActionResult> {
-  await requireAdminSession();
+  const session = await requireAdminSession();
 
   const parsed = tagFormSchema.safeParse(readTagFormData(formData));
   if (!parsed.success) {
@@ -187,7 +220,9 @@ export async function createTagAction(formData: FormData): Promise<ActionResult>
     return { ok: false, message: "태그 이름으로 slug를 만들 수 없습니다." };
   }
 
-  const duplicate = await prisma.tag.findUnique({ where: { slug } });
+  const duplicate = await prisma.tag.findUnique({
+    where: { familyId_slug: { familyId: session.familyId, slug } },
+  });
   if (duplicate) {
     return { ok: false, message: "이미 같은 이름의 태그가 있습니다." };
   }
@@ -195,6 +230,7 @@ export async function createTagAction(formData: FormData): Promise<ActionResult>
   await prisma.tag.create({
     data: {
       ...parsed.data,
+      familyId: session.familyId,
       slug,
       description: emptyToNull(parsed.data.description),
       icon: emptyToNull(parsed.data.icon),
@@ -206,7 +242,15 @@ export async function createTagAction(formData: FormData): Promise<ActionResult>
 }
 
 export async function updateTagAction(tagId: string, formData: FormData): Promise<ActionResult> {
-  await requireAdminSession();
+  const session = await requireAdminSession();
+
+  const target = await prisma.tag.findFirst({
+    where: { id: tagId, familyId: session.familyId },
+    select: { id: true },
+  });
+  if (!target) {
+    return { ok: false, message: "수정할 태그를 찾을 수 없습니다." };
+  }
 
   const parsed = tagFormSchema.safeParse(readTagFormData(formData));
   if (!parsed.success) {
@@ -216,6 +260,7 @@ export async function updateTagAction(tagId: string, formData: FormData): Promis
   const slug = slugifyTagName(parsed.data.name);
   const duplicate = await prisma.tag.findFirst({
     where: {
+      familyId: session.familyId,
       slug,
       id: { not: tagId },
     },
@@ -229,6 +274,7 @@ export async function updateTagAction(tagId: string, formData: FormData): Promis
     where: { id: tagId },
     data: {
       ...parsed.data,
+      familyId: session.familyId,
       slug,
       description: emptyToNull(parsed.data.description),
       icon: emptyToNull(parsed.data.icon),
@@ -246,6 +292,9 @@ function readVideoFormData(formData: FormData) {
     description: String(formData.get("description") ?? ""),
     searchKeywords: String(formData.get("searchKeywords") ?? ""),
     durationText: String(formData.get("durationText") ?? ""),
+    channelMode: String(formData.get("channelMode") ?? "NONE"),
+    channelId: String(formData.get("channelId") ?? ""),
+    newChannelName: String(formData.get("newChannelName") ?? ""),
     safetyStatus: String(formData.get("safetyStatus") ?? "NEEDS_REVIEW"),
     isPublished: formData.get("isPublished") === "on",
     isParentRecommended: formData.get("isParentRecommended") === "on",
@@ -267,9 +316,15 @@ function readTagFormData(formData: FormData) {
   };
 }
 
-async function resolveTagIds(selectedTagIds: string[], quickNewTags: string[]): Promise<string[]>;
-async function resolveTagIds(selectedTagIds: string[], quickNewTags: string): Promise<string[]>;
-async function resolveTagIds(selectedTagIds: string[], quickNewTags: string | string[]): Promise<string[]> {
+async function resolveTagIds(
+  familyId: string,
+  selectedTagIds: string[],
+  quickNewTags: string | string[],
+): Promise<string[]> {
+  const selectedTags = await prisma.tag.findMany({
+    where: { id: { in: selectedTagIds }, familyId },
+    select: { id: true },
+  });
   const names = Array.isArray(quickNewTags) ? quickNewTags : splitTagNames(quickNewTags);
   const createdIds: string[] = [];
 
@@ -278,8 +333,9 @@ async function resolveTagIds(selectedTagIds: string[], quickNewTags: string | st
     if (!slug) continue;
 
     const tag = await prisma.tag.upsert({
-      where: { slug },
+      where: { familyId_slug: { familyId, slug } },
       create: {
+        familyId,
         name,
         slug,
         color: "#0369a1",
@@ -293,7 +349,61 @@ async function resolveTagIds(selectedTagIds: string[], quickNewTags: string | st
     createdIds.push(tag.id);
   }
 
-  return Array.from(new Set([...selectedTagIds, ...createdIds]));
+  return Array.from(new Set([...selectedTags.map((tag) => tag.id), ...createdIds]));
+}
+async function resolveChannelId(
+  familyId: string,
+  mode: "NONE" | "EXISTING" | "NEW",
+  selectedChannelId?: string,
+  newChannelName?: string,
+): Promise<{ ok: true; channelId: string | null } | { ok: false; message: string }> {
+  if (mode === "NONE") {
+    return { ok: true, channelId: null };
+  }
+
+  if (mode === "EXISTING") {
+    const channelId = selectedChannelId?.trim() ?? "";
+    const channel = await prisma.channel.findFirst({
+      where: { id: channelId, familyId },
+      select: { id: true },
+    });
+
+    if (!channel) {
+      return { ok: false, message: "선택한 채널을 찾을 수 없습니다. 채널을 다시 선택해 주세요." };
+    }
+
+    return { ok: true, channelId: channel.id };
+  }
+
+  const displayName = cleanChannelDisplayName(newChannelName ?? "");
+  if (!displayName) {
+    return { ok: false, message: "새 채널명을 입력해 주세요." };
+  }
+  if (displayName.length > MAX_CHANNEL_DISPLAY_NAME_LENGTH) {
+    return {
+      ok: false,
+      message: `채널명은 ${MAX_CHANNEL_DISPLAY_NAME_LENGTH}자 이하로 입력해 주세요.`,
+    };
+  }
+
+  const normalizedName = normalizeChannelName(displayName);
+  if (!normalizedName) {
+    return { ok: false, message: "사용할 수 있는 채널명을 입력해 주세요." };
+  }
+
+  const channel = await prisma.channel.upsert({
+    where: { familyId_normalizedName: { familyId, normalizedName } },
+    create: {
+      familyId,
+      displayName,
+      normalizedName,
+      isActive: true,
+    },
+    update: { isActive: true },
+    select: { id: true },
+  });
+
+  return { ok: true, channelId: channel.id };
 }
 
 async function resolveThumbnail(

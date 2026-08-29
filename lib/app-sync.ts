@@ -1,6 +1,5 @@
 import { z } from "zod";
 import {
-  APP_ACCESS_SYNC_INTERVAL_HOURS,
   getAppAccessState,
   getNextRecommendedSyncAt,
   hashAppAccessKey,
@@ -9,11 +8,20 @@ import {
   type AppAccessState,
 } from "@/lib/app-access";
 import { APP_CATALOG_VIDEO_WHERE, buildAppCatalog, type AppCatalog } from "@/lib/app-catalog";
+import type { AppPolicy } from "@/lib/app-policy";
 import { prisma } from "@/lib/db";
+import {
+  createHashedRateLimitIdentifier,
+  ProcessLocalFixedWindowRateLimiter,
+} from "@/lib/rate-limit";
 
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 20;
-const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
+const appSyncRateLimiter = new ProcessLocalFixedWindowRateLimiter({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  maxRequests: RATE_LIMIT_MAX_REQUESTS,
+  maxBuckets: 5_000,
+});
 
 export const appSyncRequestSchema = z.object({
   key: z.string().trim().min(20).max(200),
@@ -23,7 +31,8 @@ export const appSyncRequestSchema = z.object({
     .min(16)
     .max(120)
     .regex(/^[a-zA-Z0-9:_-]+$/),
-  force: z.boolean().optional().default(false),
+  catalogVersion: z.string().trim().min(1).max(120).optional(),
+  force: z.boolean().optional(),
 });
 
 export type AppSyncMode = "register" | "sync";
@@ -39,6 +48,7 @@ export type AppSyncResult =
       ok: true;
       message: string;
       access: AppSyncAccess;
+      policy: AppPolicy;
       catalog: AppCatalog | null;
     }
   | {
@@ -63,8 +73,11 @@ export async function buildAppSyncResult(
   }
 
   const key = normalizeAppAccessKey(parsed.data.key);
-  const rateKey = `${options.requestIdentifier ?? "local"}:${makeAppKeyPrefix(key)}`;
-  if (!checkRateLimit(rateKey, now)) {
+  const rateKey = createHashedRateLimitIdentifier([
+    options.requestIdentifier ?? "local",
+    makeAppKeyPrefix(key),
+  ]);
+  if (!appSyncRateLimiter.allow(rateKey, now.getTime())) {
     return {
       ok: false,
       status: 429,
@@ -74,6 +87,7 @@ export async function buildAppSyncResult(
 
   const accessKey = await prisma.appAccessKey.findUnique({
     where: { keyHash: hashAppAccessKey(key) },
+    include: { family: { select: { isActive: true, wifiRequired: true } } },
   });
 
   if (!accessKey) {
@@ -81,6 +95,14 @@ export async function buildAppSyncResult(
       ok: false,
       status: 401,
       message: "등록되지 않은 앱 키입니다.",
+    };
+  }
+
+  if (!accessKey.familyId || !accessKey.family?.isActive) {
+    return {
+      ok: false,
+      status: 403,
+      message: "사용할 수 없는 가족 앱 키입니다.",
     };
   }
 
@@ -95,51 +117,66 @@ export async function buildAppSyncResult(
   }
 
   const accessState = getAppAccessState(accessKey, now);
+  const policy: AppPolicy = { wifiRequired: accessKey.family.wifiRequired };
 
   if (!accessState.canSync) {
     return {
       ok: true,
-      message: accessState.status === "expired" ? "무료 체험 기간이 종료되었습니다." : "비활성화된 앱 키입니다.",
+      message: accessState.status === "expired" ? "이용 기간이 종료되었습니다." : "비활성화된 앱 키입니다.",
       access: toAppSyncAccess(accessKey, accessState, accessKey.lastSyncedAt, now),
+      policy,
       catalog: buildAppCatalog([], now),
     };
   }
 
-  if (options.mode === "sync" && !parsed.data.force && isWithinSyncInterval(accessKey.lastSyncedAt, now)) {
-    return {
-      ok: true,
-      message: `${APP_ACCESS_SYNC_INTERVAL_HOURS}시간 안에 이미 동기화했습니다. 저장된 목록을 계속 사용합니다.`,
-      access: toAppSyncAccess(accessKey, accessState, accessKey.lastSyncedAt, now),
-      catalog: null,
-    };
-  }
-
   const videos = await prisma.video.findMany({
-    where: APP_CATALOG_VIDEO_WHERE,
+    where: { ...APP_CATALOG_VIDEO_WHERE, familyId: accessKey.familyId },
     include: {
+      channel: { select: { id: true, displayName: true } },
       tags: {
-        where: { tag: { isActive: true } },
+        where: { tag: { familyId: accessKey.familyId, isActive: true } },
         include: { tag: true },
         orderBy: { tag: { sortOrder: "asc" } },
       },
     },
     orderBy: [{ isParentRecommended: "desc" }, { parentRecommendedAt: "desc" }, { updatedAt: "desc" }],
   });
+  const catalog = buildAppCatalog(videos, now);
 
-  const updatedAccessKey = await prisma.appAccessKey.update({
-    where: { id: accessKey.id },
-    data: {
-      installationId: binding.shouldBindInstallation ? parsed.data.installationId : accessKey.installationId,
-      registeredAt: binding.shouldBindInstallation ? now : accessKey.registeredAt,
-      lastSyncedAt: now,
-    },
+  const updatedAccessKey = await prisma.$transaction(async (tx) => {
+    if (binding.shouldBindInstallation) {
+      await tx.appAccessKey.updateMany({
+        where: {
+          installationId: parsed.data.installationId,
+          id: { not: accessKey.id },
+        },
+        data: { installationId: null, registeredAt: null },
+      });
+    }
+
+    return tx.appAccessKey.update({
+      where: { id: accessKey.id },
+      data: {
+        installationId: binding.shouldBindInstallation ? parsed.data.installationId : accessKey.installationId,
+        registeredAt: binding.shouldBindInstallation ? now : accessKey.registeredAt,
+        lastSyncedAt: now,
+      },
+    });
   });
+
+  const catalogIsCurrent = options.mode === "sync" && parsed.data.catalogVersion === catalog.version;
 
   return {
     ok: true,
-    message: options.mode === "register" ? "앱 키를 등록하고 콘텐츠를 동기화했습니다." : "콘텐츠를 동기화했습니다.",
+    message:
+      options.mode === "register"
+        ? "앱 키를 등록하고 콘텐츠를 동기화했습니다."
+        : catalogIsCurrent
+          ? "승인 목록이 최신입니다."
+          : "새 승인 목록을 동기화했습니다.",
     access: toAppSyncAccess(updatedAccessKey, accessState, now, now),
-    catalog: buildAppCatalog(videos, now),
+    policy,
+    catalog: catalogIsCurrent ? null : catalog,
   };
 }
 
@@ -191,27 +228,4 @@ function toAppSyncAccess(
     lastSyncedAt: lastSyncedAt?.toISOString() ?? null,
     nextRecommendedSyncAt: getNextRecommendedSyncAt(lastSyncedAt, now),
   };
-}
-
-function checkRateLimit(identifier: string, now: Date): boolean {
-  const currentTime = now.getTime();
-  const bucket = rateLimitBuckets.get(identifier);
-
-  if (!bucket || bucket.resetAt <= currentTime) {
-    rateLimitBuckets.set(identifier, { count: 1, resetAt: currentTime + RATE_LIMIT_WINDOW_MS });
-    return true;
-  }
-
-  if (bucket.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return false;
-  }
-
-  bucket.count += 1;
-  return true;
-}
-
-function isWithinSyncInterval(lastSyncedAt: Date | null, now: Date): boolean {
-  if (!lastSyncedAt) return false;
-  const intervalMs = APP_ACCESS_SYNC_INTERVAL_HOURS * 60 * 60 * 1000;
-  return now.getTime() - lastSyncedAt.getTime() < intervalMs;
 }

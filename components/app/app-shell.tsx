@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { recordKidsSignalAction } from "@/app/kids/actions";
 import { DevicePinningNotice } from "@/components/app/device-pinning-notice";
 import { getKidsClientKey } from "@/components/kids/kids-client-key";
@@ -13,6 +13,13 @@ import {
 } from "@/lib/kids-playlist";
 import { KIDS_SIGNAL_OPTIONS, type KidsFeedbackSignalType } from "@/lib/kids-signals";
 import type { AppCatalog, AppCatalogVideo } from "@/lib/app-catalog";
+import { filterAppCatalogVideos } from "@/lib/app-video-filters";
+import {
+  APP_FALLBACK_VIDEOS,
+  buildFallbackTags,
+  filterFallbackVideos,
+  type AppFallbackVideo,
+} from "@/lib/app-fallback-catalog";
 import { buildEmbedUrl } from "@/lib/youtube";
 
 type AppSyncAccess = {
@@ -26,11 +33,21 @@ type AppSyncAccess = {
   nextRecommendedSyncAt: string;
 };
 
+type AppPolicy = {
+  wifiRequired: boolean;
+};
+
+type AppPolicyResponse = {
+  ok: true;
+  policy: AppPolicy;
+};
+
 type AppSyncResponse =
   | {
       ok: true;
       message: string;
       access: AppSyncAccess;
+      policy: AppPolicy;
       catalog: AppCatalog | null;
     }
   | {
@@ -41,6 +58,7 @@ type AppSyncResponse =
 type CachedAppSync = {
   access: AppSyncAccess;
   catalog: AppCatalog;
+  policy?: AppPolicy;
   syncedAt: string;
 };
 
@@ -52,8 +70,9 @@ type ParentChallenge = {
 const APP_KEY_STORAGE_KEY = "sontube:app-access-key";
 const APP_INSTALLATION_ID_STORAGE_KEY = "sontube:app-installation-id";
 const APP_SYNC_STORAGE_KEY = "sontube:app-catalog-cache";
-const DAILY_SYNC_MS = 24 * 60 * 60 * 1000;
 const EMPTY_APP_VIDEOS: AppCatalogVideo[] = [];
+const DEFAULT_WIFI_REQUIRED = true;
+const NETWORK_CHECK_TIMEOUT_MS = 5_000;
 
 export function AppShell() {
   const [isReady, setIsReady] = useState(false);
@@ -62,6 +81,7 @@ export function AppShell() {
   const [syncState, setSyncState] = useState<CachedAppSync | null>(null);
   const [query, setQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState("");
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const [playlist, setPlaylist] = useState<KidsPlaylistItem[]>([]);
   const [feedbackByVideoId, setFeedbackByVideoId] = useState<Record<string, KidsFeedbackSignalType>>({});
@@ -72,60 +92,101 @@ export function AppShell() {
   const [parentChallenge, setParentChallenge] = useState<ParentChallenge>(() => createParentChallenge());
   const [parentAnswer, setParentAnswer] = useState("");
   const [parentGateError, setParentGateError] = useState("");
+  const [showConnectionSamples, setShowConnectionSamples] = useState(false);
+  const syncInFlightRef = useRef<Promise<boolean> | null>(null);
 
   const syncWithKey = useCallback(
-    async (key: string, options: { endpoint?: string; force?: boolean } = {}) => {
-      const trimmedKey = key.trim();
-      const currentInstallationId = getOrCreateInstallationId();
+    async (
+      key: string,
+      options: { endpoint?: string; replaceStoredKey?: boolean } = {},
+    ): Promise<boolean> => {
+      if (syncInFlightRef.current) return syncInFlightRef.current;
 
-      if (!trimmedKey) {
-        setMessage("관리자 화면에서 만든 앱 키를 먼저 등록해 주세요.");
-        return;
-      }
+      const task = (async () => {
+        const trimmedKey = key.trim();
+        const currentInstallationId = getOrCreateInstallationId();
 
-      setIsSyncing(true);
-      setMessage("");
+        if (!trimmedKey) {
+          setMessage("관리자 화면에서 만든 앱 키를 먼저 등록해 주세요.");
+          return false;
+        }
 
+        setIsSyncing(true);
+        setMessage("");
+
+        try {
+          const policy = await fetchAppPolicy(currentInstallationId);
+          if (policy.wifiRequired && !isRequiredNetworkAvailable()) {
+            setShowConnectionSamples(true);
+            setMessage("Wi-Fi 연결을 확인할 수 없어 샘플 목록만 보여줍니다.");
+            return false;
+          }
+
+          const previousCache = readCachedSync();
+          const response = await fetchWithTimeout(options.endpoint ?? "/api/app/sync", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              key: trimmedKey,
+              installationId: currentInstallationId,
+              catalogVersion: previousCache?.catalog.version,
+            }),
+          });
+          const data = (await response.json()) as AppSyncResponse;
+
+          if (!response.ok || !data.ok) {
+            if (response.status >= 500) setShowConnectionSamples(true);
+            setMessage(data.message || "동기화에 실패했습니다.");
+            return false;
+          }
+
+          const previousCatalog = previousCache?.catalog ?? null;
+          const nextCatalog = data.catalog ?? previousCatalog;
+          if (!nextCatalog) {
+            setShowConnectionSamples(true);
+            setMessage("저장된 목록이 없어 샘플 목록만 보여줍니다.");
+            return false;
+          }
+
+          const cached: CachedAppSync = {
+            access: data.access,
+            policy: data.policy,
+            catalog: nextCatalog,
+            syncedAt: new Date().toISOString(),
+          };
+
+          if (options.replaceStoredKey) {
+            window.localStorage.setItem(APP_KEY_STORAGE_KEY, trimmedKey);
+            setSavedKey(trimmedKey);
+            setKeyInput("");
+          }
+          window.localStorage.setItem(APP_SYNC_STORAGE_KEY, JSON.stringify(cached));
+          setSyncState(cached);
+          setShowConnectionSamples(false);
+          setSelectedChannelId((current) =>
+            current && nextCatalog.videos.some((video) => video.channel?.id === current) ? current : null,
+          );
+          setActiveVideoId((current) => current ?? nextCatalog.videos[0]?.id ?? null);
+          setMessage(data.message);
+          return true;
+        } catch (error) {
+          setShowConnectionSamples(true);
+          const detail =
+            error instanceof Error && error.name !== "AbortError"
+              ? error.message
+              : "연결 확인 시간이 초과되었습니다.";
+          setMessage(`${detail} 샘플 목록만 보여줍니다.`);
+          return false;
+        } finally {
+          setIsSyncing(false);
+        }
+      })();
+
+      syncInFlightRef.current = task;
       try {
-        const response = await fetch(options.endpoint ?? "/api/app/sync", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            key: trimmedKey,
-            installationId: currentInstallationId,
-            force: Boolean(options.force),
-          }),
-        });
-        const data = (await response.json()) as AppSyncResponse;
-
-        if (!response.ok || !data.ok) {
-          throw new Error(data.message || "동기화에 실패했습니다.");
-        }
-
-        const previousCache = readCachedSync();
-        const previousCatalog = previousCache?.catalog ?? null;
-        const nextCatalog = data.catalog ?? previousCatalog;
-        if (!nextCatalog) {
-          throw new Error("저장된 목록이 없습니다. 다시 불러오기를 시도해 주세요.");
-        }
-
-        const cached: CachedAppSync = {
-          access: data.access,
-          catalog: nextCatalog,
-          syncedAt: data.catalog ? new Date().toISOString() : previousCache?.syncedAt ?? new Date().toISOString(),
-        };
-
-        window.localStorage.setItem(APP_KEY_STORAGE_KEY, trimmedKey);
-        window.localStorage.setItem(APP_SYNC_STORAGE_KEY, JSON.stringify(cached));
-        setSavedKey(trimmedKey);
-        setKeyInput("");
-        setSyncState(cached);
-        setActiveVideoId((current) => current ?? nextCatalog.videos[0]?.id ?? null);
-        setMessage(data.message);
-      } catch (error) {
-        setMessage(error instanceof Error ? error.message : "동기화에 실패했습니다.");
+        return await task;
       } finally {
-        setIsSyncing(false);
+        syncInFlightRef.current = null;
       }
     },
     [],
@@ -142,34 +203,77 @@ export function AppShell() {
     setSyncState(cached);
     setPlaylist(items);
     setActiveVideoId(cached?.catalog.videos[0]?.id ?? null);
-    setIsReady(true);
 
-    if (key && shouldSync(cached)) {
-      void syncWithKey(key);
+    if (!key) {
+      setIsReady(true);
+      return;
     }
+
+    void syncWithKey(key).finally(() => setIsReady(true));
   }, [syncWithKey]);
+
+  useEffect(() => {
+    if (!isReady || !savedKey) return;
+
+    const checkOnReturn = () => {
+      if (document.visibilityState === "visible") void syncWithKey(savedKey);
+    };
+
+    const appWindow = window as Window & { SonTubeCheckForUpdates?: () => void };
+    appWindow.SonTubeCheckForUpdates = checkOnReturn;
+
+    document.addEventListener("visibilitychange", checkOnReturn);
+    window.addEventListener("focus", checkOnReturn);
+    return () => {
+      if (appWindow.SonTubeCheckForUpdates === checkOnReturn) delete appWindow.SonTubeCheckForUpdates;
+      document.removeEventListener("visibilitychange", checkOnReturn);
+      window.removeEventListener("focus", checkOnReturn);
+    };
+  }, [isReady, savedKey, syncWithKey]);
 
   const cachedAccess = syncState?.access ?? null;
   const access = useMemo(() => (cachedAccess ? evaluateLocalAccess(cachedAccess) : null), [cachedAccess]);
   const videos = useMemo(() => (access?.canSync ? syncState?.catalog.videos ?? EMPTY_APP_VIDEOS : EMPTY_APP_VIDEOS), [access, syncState]);
-  const visibleVideos = useMemo(() => filterVideos(videos, query, selectedTag), [videos, query, selectedTag]);
+  const visibleVideos = useMemo(
+    () => filterAppCatalogVideos(videos, query, selectedTag, selectedChannelId),
+    [videos, query, selectedTag, selectedChannelId],
+  );
   const recommendedVideos = useMemo(() => videos.filter((video) => video.isParentRecommended).slice(0, 8), [videos]);
   const hotTags = useMemo(() => buildHotTags(videos), [videos]);
+  const fallbackVideos = useMemo(
+    () => filterFallbackVideos(APP_FALLBACK_VIDEOS, query, selectedTag),
+    [query, selectedTag],
+  );
+  const fallbackTags = useMemo(() => buildFallbackTags(APP_FALLBACK_VIDEOS), []);
   const activeVideo = videos.find((video) => video.id === activeVideoId) ?? visibleVideos[0] ?? null;
+  const selectedChannel = selectedChannelId
+    ? videos.find((video) => video.channel?.id === selectedChannelId)?.channel ?? null
+    : null;
+  const activeChannelVideoCount = activeVideo?.channel
+    ? videos.filter((video) => video.channel?.id === activeVideo.channel?.id).length
+    : 0;
   const hasRegisteredKey = Boolean(savedKey);
   const isInitialSetup = !hasRegisteredKey;
 
   function submitKey(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void syncWithKey(keyInput, { endpoint: "/api/app/register", force: true });
-  }
-
-  function manualSync() {
-    void syncWithKey(savedKey, { endpoint: "/api/app/sync", force: true });
+    void syncWithKey(keyInput, { endpoint: "/api/app/register", replaceStoredKey: true });
   }
 
   function chooseVideo(videoId: string) {
     setActiveVideoId(videoId);
+  }
+
+  function showActiveChannelVideos() {
+    if (!activeVideo?.channel || activeChannelVideoCount < 2) return;
+
+    setQuery("");
+    setSelectedTag("");
+    setSelectedChannelId(activeVideo.channel.id);
+  }
+
+  function showAllVideos() {
+    setSelectedChannelId(null);
   }
 
   function requestSettings() {
@@ -216,6 +320,8 @@ export function AppShell() {
     void recordKidsSignalAction({
       videoId: video.id,
       clientKey: getKidsClientKey(),
+      appKey: savedKey,
+      installationId: getOrCreateInstallationId(),
       type: "PLAYLIST",
       active: !isSaved,
     });
@@ -226,6 +332,8 @@ export function AppShell() {
     void recordKidsSignalAction({
       videoId: video.id,
       clientKey: getKidsClientKey(),
+      appKey: savedKey,
+      installationId: getOrCreateInstallationId(),
       type,
       active: true,
     });
@@ -243,18 +351,21 @@ export function AppShell() {
             <p className="text-sm font-bold text-ocean">SonTube App</p>
             <h1 className="text-2xl font-black text-ink md:text-3xl">안전 영상서랍</h1>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {access && (
-              <span className={`rounded-md px-3 py-2 text-xs font-black ${getAccessClassName(access.status)}`}>
-                {access.label}
-              </span>
+          <div className="flex items-center gap-2">
+            {showConnectionSamples && (
+              <span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-bold text-amber-700">샘플 화면</span>
             )}
             <button
               type="button"
               onClick={requestSettings}
-              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-ocean hover:text-ocean"
+              aria-label="설정"
+              title="설정"
+              className="grid h-9 w-9 place-items-center rounded-full text-slate-500 opacity-40 transition hover:bg-slate-100 hover:opacity-80 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
             >
-              설정
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.7">
+                <path d="M9.6 3.4h4.8l.5 2a7.5 7.5 0 0 1 1.4.8l2-.6 2.4 4.1-1.5 1.4a7 7 0 0 1 0 1.8l1.5 1.4-2.4 4.1-2-.6a7.5 7.5 0 0 1-1.4.8l-.5 2H9.6l-.5-2a7.5 7.5 0 0 1-1.4-.8l-2 .6-2.4-4.1 1.5-1.4a7 7 0 0 1 0-1.8L3.3 9.7l2.4-4.1 2 .6a7.5 7.5 0 0 1 1.4-.8l.5-2Z" />
+                <circle cx="12" cy="12" r="2.6" />
+              </svg>
             </button>
           </div>
         </div>
@@ -300,7 +411,7 @@ export function AppShell() {
               <div>
                 <h2 className="text-lg font-black text-ink">앱 키 등록</h2>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
-                  부모님 관리자 화면의 앱 키 메뉴에서 만든 키를 등록하면 승인 영상만 가져옵니다.
+                  부모님 관리자 화면의 앱 키 메뉴에서 만든 키를 확인합니다. 서버가 정상 승인한 뒤에만 기존 키와 목록을 교체합니다.
                 </p>
               </div>
               <input
@@ -318,15 +429,7 @@ export function AppShell() {
                   disabled={isSyncing || !keyInput.trim()}
                   className="rounded-md bg-ink px-4 py-2 text-sm font-black text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  등록하고 불러오기
-                </button>
-                <button
-                  type="button"
-                  onClick={manualSync}
-                  disabled={isSyncing || !hasRegisteredKey}
-                  className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 hover:border-ocean hover:text-ocean disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  다시 불러오기
+                  {hasRegisteredKey ? "새 키 확인 후 교체" : "등록하고 불러오기"}
                 </button>
                 {hasRegisteredKey && (
                   <button
@@ -345,9 +448,12 @@ export function AppShell() {
               <h2 className="text-lg font-black text-ink">동기화 상태</h2>
               <dl className="grid gap-2 md:grid-cols-2">
                 <StatusInfo label="등록 키" value={access ? `${access.keyPrefix}...` : "미등록"} />
-                <StatusInfo label="최근 동기화" value={syncState ? formatDateTime(syncState.syncedAt) : "아직 없음"} />
-                <StatusInfo label="다음 자동 갱신" value={access ? formatDateTime(access.nextRecommendedSyncAt) : "키 등록 후 표시"} />
-                <StatusInfo label="체험 종료" value={access ? formatDate(access.trialEndsAt) : "키 등록 후 표시"} />
+                <StatusInfo label="최근 목록 확인" value={syncState ? formatDateTime(syncState.syncedAt) : "아직 없음"} />
+                <StatusInfo label="확인 시점" value="앱 시작·복귀마다" />
+                <StatusInfo
+                  label="목록 수신 환경"
+                  value={(syncState?.policy?.wifiRequired ?? DEFAULT_WIFI_REQUIRED) ? "Wi-Fi만" : "Wi-Fi + 모바일 데이터"}
+                />
               </dl>
               <p>
                 앱에는 광고를 표시하지 않습니다. 단, 재생에 사용하는 YouTube 플레이어 자체 광고는 YouTube 정책과 계정 상태에 따라 노출될 수 있습니다.
@@ -366,11 +472,23 @@ export function AppShell() {
             키가 등록되기 전에는 영상 목록을 보여주지 않습니다. 부모님이 승인한 콘텐츠만 앱으로 동기화됩니다.
           </p>
         </section>
+      ) : showConnectionSamples ? (
+        <OfflineSampleCatalog
+          videos={fallbackVideos}
+          tags={fallbackTags}
+          query={query}
+          selectedTag={selectedTag}
+          message={message}
+          isChecking={isSyncing}
+          onQueryChange={setQuery}
+          onTagChange={setSelectedTag}
+          onRetry={() => void syncWithKey(savedKey)}
+        />
       ) : !access?.canSync ? (
         <section className="mx-auto grid max-w-3xl gap-3 px-4 py-14 text-center">
-          <h2 className="text-2xl font-black text-ink">{access?.label ?? "이용 상태 확인 필요"}</h2>
+          <h2 className="text-2xl font-black text-ink">이용 상태 확인 필요</h2>
           <p className="text-sm leading-6 text-slate-600">
-            무료 체험이 끝났거나 키가 비활성화되어 영상 카탈로그를 사용할 수 없습니다. 결제 연동은 웹 관리자 쪽에서 별도로 검토합니다.
+            이용 기간이 끝났거나 키가 비활성화되어 영상 카탈로그를 사용할 수 없습니다. 부모님 관리자 화면에서 상태를 확인해 주세요.
           </p>
         </section>
       ) : (
@@ -398,6 +516,9 @@ export function AppShell() {
               <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="grid gap-2">
                   <h2 className="break-words text-xl font-black text-ink">{activeVideo.title}</h2>
+                  {activeVideo.channel && (
+                    <p className="text-xs font-bold text-slate-500">{activeVideo.channel.name}</p>
+                  )}
                   {activeVideo.description && <p className="text-sm leading-6 text-slate-600">{activeVideo.description}</p>}
                   <div className="flex flex-wrap gap-2">
                     {activeVideo.tags.map((tag) => (
@@ -415,6 +536,19 @@ export function AppShell() {
                       </span>
                     )}
                   </div>
+                  {activeVideo.channel && activeChannelVideoCount >= 2 && (
+                    <button
+                      type="button"
+                      onClick={
+                        selectedChannelId === activeVideo.channel.id ? showAllVideos : showActiveChannelVideos
+                      }
+                      className="w-fit rounded-md bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                    >
+                      {selectedChannelId === activeVideo.channel.id
+                        ? "전체 목록으로"
+                        : `같은 채널의 승인 영상 ${activeChannelVideoCount}개`}
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -461,6 +595,20 @@ export function AppShell() {
                   className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ocean focus:ring-2 focus:ring-sky-100"
                 />
               </label>
+              {selectedChannel && (
+                <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
+                  <span className="min-w-0 truncate text-xs font-bold text-slate-600">
+                    {selectedChannel.name} 승인 영상만 보는 중
+                  </span>
+                  <button
+                    type="button"
+                    onClick={showAllVideos}
+                    className="shrink-0 text-xs font-black text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-700"
+                  >
+                    전체 목록으로
+                  </button>
+                </div>
+              )}
               <div className="flex flex-wrap gap-2">
                 <TagButton active={!selectedTag} onClick={() => setSelectedTag("")}>전체</TagButton>
                 {hotTags.map((tag) => (
@@ -471,11 +619,11 @@ export function AppShell() {
               </div>
             </section>
 
-            {recommendedVideos.length > 0 && (
+            {!selectedChannel && recommendedVideos.length > 0 && (
               <VideoRail title="부모님 최근추천" videos={recommendedVideos} activeVideoId={activeVideo?.id ?? null} onChoose={chooseVideo} />
             )}
 
-            {playlist.length > 0 && (
+            {!selectedChannel && playlist.length > 0 && (
               <VideoRail
                 title="내 목록"
                 videos={playlistToVideos(playlist, videos)}
@@ -484,7 +632,12 @@ export function AppShell() {
               />
             )}
 
-            <VideoRail title="영상 목록" videos={visibleVideos} activeVideoId={activeVideo?.id ?? null} onChoose={chooseVideo} />
+            <VideoRail
+              title={selectedChannel ? `${selectedChannel.name} 승인 영상` : "영상 목록"}
+              videos={visibleVideos}
+              activeVideoId={activeVideo?.id ?? null}
+              onChoose={chooseVideo}
+            />
           </aside>
         </div>
       )}
@@ -492,6 +645,104 @@ export function AppShell() {
   );
 }
 
+function OfflineSampleCatalog({
+  videos,
+  tags,
+  query,
+  selectedTag,
+  message,
+  isChecking,
+  onQueryChange,
+  onTagChange,
+  onRetry,
+}: {
+  videos: AppFallbackVideo[];
+  tags: Array<{ name: string; slug: string }>;
+  query: string;
+  selectedTag: string;
+  message: string;
+  isChecking: boolean;
+  onQueryChange: (value: string) => void;
+  onTagChange: (value: string) => void;
+  onRetry: () => void;
+}) {
+  return (
+    <section className="mx-auto grid max-w-7xl gap-5 px-4 py-5 md:px-6">
+      <div className="grid gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 md:grid-cols-[1fr_auto] md:items-center">
+        <div>
+          <p className="text-xs font-black text-amber-700">연결 전 샘플 화면</p>
+          <h2 className="mt-1 text-xl font-black text-ink">실제 승인 목록은 숨겨 두었어요</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-600">
+            지정된 통신 환경을 확인하지 못해 검색·태그·카드 배치 검수용 샘플만 표시합니다. 이 카드는 재생되지 않습니다.
+          </p>
+          {message && <p className="mt-2 text-sm font-semibold text-amber-800">{message}</p>}
+        </div>
+        <button
+          type="button"
+          onClick={onRetry}
+          disabled={isChecking}
+          className="rounded-md border border-amber-300 bg-white px-4 py-2 text-sm font-black text-amber-800 hover:border-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isChecking ? "연결 확인 중" : "연결 다시 확인"}
+        </button>
+      </div>
+
+      <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <label className="grid gap-1 text-sm font-black text-slate-700">
+          샘플 제목/키워드 검색
+          <input
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            placeholder="예: 동물, 과학, 영어"
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ocean focus:ring-2 focus:ring-sky-100"
+          />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <TagButton active={!selectedTag} onClick={() => onTagChange("")}>전체</TagButton>
+          {tags.map((tag) => (
+            <TagButton key={tag.slug} active={selectedTag === tag.slug} onClick={() => onTagChange(tag.slug)}>
+              {tag.name}
+            </TagButton>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-lg font-black text-ink">화면 검수용 샘플</h2>
+        <span className="text-xs font-bold text-slate-500">{videos.length}개</span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {videos.length === 0 && (
+          <p className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-slate-500 sm:col-span-2 lg:col-span-3">
+            조건에 맞는 샘플이 없습니다.
+          </p>
+        )}
+        {videos.map((video) => (
+          <article key={video.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div className="grid aspect-video place-items-center text-5xl" style={{ backgroundColor: video.accent }} aria-hidden="true">
+              {video.emoji}
+            </div>
+            <div className="grid gap-2 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="font-black text-ink">{video.title}</h3>
+                <span className="shrink-0 text-xs font-bold text-slate-500">{video.durationText}</span>
+              </div>
+              <p className="text-xs font-bold text-slate-500">{video.channel.name}</p>
+              <p className="text-sm leading-6 text-slate-600">{video.description}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {video.tags.map((tag) => (
+                  <span key={tag.slug} className="rounded-md bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">
+                    {tag.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
 function VideoRail({
   title,
   videos,
@@ -524,6 +775,9 @@ function VideoRail({
             <img src={video.thumbnailUrl} alt="" className="aspect-video w-24 rounded-md object-cover" />
             <span className="grid min-w-0 content-center gap-1">
               <span className="line-clamp-2 break-words text-sm font-black text-ink">{video.title}</span>
+              {video.channel && (
+                <span className="truncate text-xs font-semibold text-slate-500">{video.channel.name}</span>
+              )}
               <span className="text-xs font-semibold text-slate-500">{video.durationText ?? "시간 미입력"}</span>
             </span>
           </button>
@@ -564,25 +818,10 @@ function evaluateLocalAccess(access: AppSyncAccess): AppSyncAccess {
   if (paidUntilMs > now) return { ...access, status: "paid", canSync: true, label: "이용 가능" };
 
   if (new Date(access.trialEndsAt).getTime() > now) {
-    return { ...access, status: "trial", canSync: true, label: "무료 체험" };
+    return { ...access, status: "trial", canSync: true, label: "이용 가능" };
   }
 
-  return { ...access, status: "expired", canSync: false, label: "체험 종료" };
-}
-
-function filterVideos(videos: AppCatalogVideo[], query: string, selectedTag: string): AppCatalogVideo[] {
-  const normalizedQuery = query.trim().toLowerCase();
-
-  return videos.filter((video) => {
-    const matchesTag = selectedTag ? video.tags.some((tag) => tag.slug === selectedTag) : true;
-    const haystack = [video.title, video.description, video.searchKeywords, ...video.tags.map((tag) => tag.name)]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-    const matchesQuery = normalizedQuery ? haystack.includes(normalizedQuery) : true;
-
-    return matchesTag && matchesQuery;
-  });
+  return { ...access, status: "expired", canSync: false, label: "이용 종료" };
 }
 
 function buildHotTags(videos: AppCatalogVideo[]): Array<{ slug: string; name: string; count: number }> {
@@ -606,19 +845,71 @@ function playlistToVideos(playlist: KidsPlaylistItem[], videos: AppCatalogVideo[
   return playlist.map((item) => videosById.get(item.id)).filter((video): video is AppCatalogVideo => Boolean(video));
 }
 
+async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), NETWORK_CHECK_TIMEOUT_MS);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+async function fetchAppPolicy(installationId: string): Promise<AppPolicy> {
+  const query = new URLSearchParams({ installationId });
+  const response = await fetchWithTimeout(`/api/app/policy?${query.toString()}`, { cache: "no-store" });
+  if (!response.ok) throw new Error("앱 통신 설정을 확인하지 못했습니다.");
+
+  const data = (await response.json()) as Partial<AppPolicyResponse>;
+  return {
+    wifiRequired:
+      data.ok === true && typeof data.policy?.wifiRequired === "boolean"
+        ? data.policy.wifiRequired
+        : DEFAULT_WIFI_REQUIRED,
+  };
+}
+
+function isRequiredNetworkAvailable(): boolean {
+  const bridge = (window as Window & { SonTubeNetwork?: { isWifiConnected: () => boolean } }).SonTubeNetwork;
+  if (bridge) {
+    try {
+      return bridge.isWifiConnected();
+    } catch {
+      return false;
+    }
+  }
+
+  return navigator.onLine;
+}
+
 function readCachedSync(): CachedAppSync | null {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(APP_SYNC_STORAGE_KEY) ?? "null") as CachedAppSync | null;
     if (!parsed?.access || !parsed.catalog || !Array.isArray(parsed.catalog.videos)) return null;
-    return parsed;
+    return {
+      ...parsed,
+      catalog: {
+        ...parsed.catalog,
+        videos: parsed.catalog.videos.map((video) => ({
+          ...video,
+          channel: normalizeCachedChannel((video as unknown as { channel?: unknown }).channel),
+        })),
+      },
+    };
   } catch {
     return null;
   }
 }
 
-function shouldSync(cached: CachedAppSync | null): boolean {
-  if (!cached) return true;
-  return Date.now() - new Date(cached.syncedAt).getTime() >= DAILY_SYNC_MS;
+function normalizeCachedChannel(value: unknown): AppCatalogVideo["channel"] {
+  if (!value || typeof value !== "object") return null;
+
+  const candidate = value as { id?: unknown; name?: unknown };
+  if (typeof candidate.id !== "string" || typeof candidate.name !== "string") return null;
+  if (!candidate.id.trim() || !candidate.name.trim()) return null;
+
+  return { id: candidate.id, name: candidate.name };
 }
 
 function readPlaylist(): KidsPlaylistItem[] {
@@ -634,6 +925,21 @@ function writePlaylist(items: KidsPlaylistItem[]) {
 }
 
 function getOrCreateInstallationId(): string {
+  const nativeBridge = (
+    window as Window & { SonTubeDevice?: { getInstallationId: () => string } }
+  ).SonTubeDevice;
+  if (nativeBridge) {
+    try {
+      const nativeId = nativeBridge.getInstallationId();
+      if (/^[a-zA-Z0-9:_-]{16,120}$/.test(nativeId)) {
+        window.localStorage.setItem(APP_INSTALLATION_ID_STORAGE_KEY, nativeId);
+        return nativeId;
+      }
+    } catch {
+      // Fall through to a browser-local installation identifier.
+    }
+  }
+
   const existing = window.localStorage.getItem(APP_INSTALLATION_ID_STORAGE_KEY);
   if (existing) return existing;
 
@@ -641,7 +947,6 @@ function getOrCreateInstallationId(): string {
   window.localStorage.setItem(APP_INSTALLATION_ID_STORAGE_KEY, next);
   return next;
 }
-
 function createRandomId(): string {
   const browserCrypto = window.crypto;
   if (typeof browserCrypto.randomUUID === "function") {
@@ -660,19 +965,6 @@ function createParentChallenge(): ParentChallenge {
   };
 }
 
-function getAccessClassName(status: AppSyncAccess["status"]): string {
-  switch (status) {
-    case "disabled":
-      return "bg-slate-100 text-slate-600";
-    case "trial":
-      return "bg-sky-100 text-sky-800";
-    case "paid":
-      return "bg-green-100 text-green-800";
-    case "expired":
-      return "bg-amber-100 text-amber-800";
-  }
-}
-
 function getFeedbackClassName(tone: "positive" | "curious" | "soft" | "hard"): string {
   switch (tone) {
     case "positive":
@@ -684,10 +976,6 @@ function getFeedbackClassName(tone: "positive" | "curious" | "soft" | "hard"): s
     case "hard":
       return "border-slate-300 bg-white text-slate-700 hover:border-slate-500";
   }
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium" }).format(new Date(value));
 }
 
 function formatDateTime(value: string): string {

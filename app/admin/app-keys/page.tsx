@@ -6,9 +6,10 @@ import { prisma } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export default async function AdminAppKeysPage() {
-  await requireAdminSession();
+  const session = await requireAdminSession();
 
   const keys = await prisma.appAccessKey.findMany({
+    where: { familyId: session.familyId },
     orderBy: { createdAt: "desc" },
   });
 

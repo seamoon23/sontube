@@ -10,23 +10,28 @@ type EditVideoPageProps = {
 };
 
 export default async function EditVideoPage({ params }: EditVideoPageProps) {
-  await requireAdminSession();
+  const session = await requireAdminSession();
 
   const { id } = await params;
-  const [video, tags, existingVideos] = await Promise.all([
-    prisma.video.findUnique({
-      where: { id },
+  const [video, tags, existingVideos, channels] = await Promise.all([
+    prisma.video.findFirst({
+      where: { id, familyId: session.familyId },
       include: { tags: { include: { tag: true } } },
     }),
     prisma.tag.findMany({
-      where: { isActive: true },
+      where: { familyId: session.familyId, isActive: true },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
     prisma.video.findMany({
-      where: { id: { not: id } },
+      where: { familyId: session.familyId, id: { not: id } },
       include: { tags: { include: { tag: true } } },
       orderBy: { updatedAt: "desc" },
       take: 100,
+    }),
+    prisma.channel.findMany({
+      where: { familyId: session.familyId },
+      orderBy: [{ isActive: "desc" }, { displayName: "asc" }],
+      select: { id: true, displayName: true, isActive: true },
     }),
   ]);
 
@@ -39,6 +44,7 @@ export default async function EditVideoPage({ params }: EditVideoPageProps) {
     description: video.description ?? "",
     searchKeywords: video.searchKeywords ?? "",
     durationText: video.durationText ?? "",
+    channelId: video.channelId,
     safetyStatus: video.safetyStatus,
     isPublished: video.isPublished,
     isParentRecommended: video.isParentRecommended,
@@ -58,6 +64,7 @@ export default async function EditVideoPage({ params }: EditVideoPageProps) {
         mode="edit"
         initial={initial}
         tags={tags.map(serializeTag)}
+        channels={channels}
         existingVideos={existingVideos.map((item) => ({
           id: item.id,
           title: item.title,

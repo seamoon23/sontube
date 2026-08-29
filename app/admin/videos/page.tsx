@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getThumbnailUrl } from "@/lib/thumbnails";
 import { requireAdminSession } from "@/lib/admin-session";
-import { buildAdminVideoWhere } from "@/lib/admin-video-filters";
+import { buildAdminVideoWhere, UNASSIGNED_CHANNEL_FILTER } from "@/lib/admin-video-filters";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +10,7 @@ type VideosPageProps = {
   searchParams: Promise<{
     q?: string;
     tag?: string;
+    channel?: string;
     status?: string;
     recommended?: string;
     thumbnail?: string;
@@ -17,20 +18,25 @@ type VideosPageProps = {
 };
 
 export default async function AdminVideosPage({ searchParams }: VideosPageProps) {
-  await requireAdminSession();
+  const session = await requireAdminSession();
 
   const params = await searchParams;
   const q = params.q?.trim() ?? "";
   const tagId = params.tag ?? "";
+  const channelId = params.channel ?? "";
   const status = params.status ?? "";
   const recommended = params.recommended ?? "";
   const thumbnail = params.thumbnail ?? "";
-  const where = buildAdminVideoWhere({ q, tagId, status, recommended, thumbnail });
+  const where = {
+    familyId: session.familyId,
+    ...buildAdminVideoWhere({ q, tagId, channelId, status, recommended, thumbnail }),
+  };
 
-  const [videos, tags] = await Promise.all([
+  const [videos, tags, channels] = await Promise.all([
     prisma.video.findMany({
       where,
       include: {
+        channel: true,
         tags: {
           include: { tag: true },
           orderBy: { tag: { sortOrder: "asc" } },
@@ -39,8 +45,13 @@ export default async function AdminVideosPage({ searchParams }: VideosPageProps)
       orderBy: { updatedAt: "desc" },
     }),
     prisma.tag.findMany({
-      where: { isActive: true },
+      where: { familyId: session.familyId, isActive: true },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    }),
+    prisma.channel.findMany({
+      where: { familyId: session.familyId },
+      orderBy: [{ isActive: "desc" }, { displayName: "asc" }],
+      select: { id: true, displayName: true, isActive: true },
     }),
   ]);
 
@@ -59,13 +70,13 @@ export default async function AdminVideosPage({ searchParams }: VideosPageProps)
         </Link>
       </div>
 
-      <form className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_160px_160px_160px_180px_auto]">
-        <label className="grid gap-1 text-xs font-semibold text-slate-600">
+      <form className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-2 lg:grid-cols-4">
+        <label className="grid gap-1 text-xs font-semibold text-slate-600 md:col-span-2">
           검색
           <input
             name="q"
             defaultValue={q}
-            placeholder="제목, 설명, videoId"
+            placeholder="제목, 설명, 채널, videoId"
             className="rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
         </label>
@@ -76,6 +87,22 @@ export default async function AdminVideosPage({ searchParams }: VideosPageProps)
             {tags.map((tag) => (
               <option key={tag.id} value={tag.id}>
                 {tag.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs font-semibold text-slate-600">
+          채널
+          <select
+            name="channel"
+            defaultValue={channelId}
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+          >
+            <option value="">모든 채널</option>
+            <option value={UNASSIGNED_CHANNEL_FILTER}>채널 미지정</option>
+            {channels.map((channel) => (
+              <option key={channel.id} value={channel.id}>
+                {channel.displayName}{channel.isActive ? "" : " (사용 중지)"}
               </option>
             ))}
           </select>
@@ -135,6 +162,19 @@ export default async function AdminVideosPage({ searchParams }: VideosPageProps)
                 <p className="break-all text-xs text-slate-500">{video.youtubeVideoId}</p>
               </div>
               <div className="flex flex-wrap gap-2">
+                {video.channel ? (
+                  <Link
+                    href={{ pathname: "/admin/videos", query: { channel: video.channel.id } }}
+                    className="rounded-md bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100"
+                    title={`${video.channel.displayName} 채널 영상만 보기`}
+                  >
+                    채널 · {video.channel.displayName}
+                  </Link>
+                ) : (
+                  <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-500">
+                    채널 미지정
+                  </span>
+                )}
                 {video.tags.map(({ tag }) => (
                   <span
                     key={tag.id}

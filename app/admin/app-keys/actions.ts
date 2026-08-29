@@ -18,7 +18,7 @@ export type AppKeyActionResult = {
 };
 
 export async function createAppAccessKeyAction(formData: FormData): Promise<AppKeyActionResult> {
-  await requireAdminSession();
+  const session = await requireAdminSession();
 
   const name = normalizeName(String(formData.get("name") ?? ""));
   if (name.length > 80) {
@@ -27,14 +27,23 @@ export async function createAppAccessKeyAction(formData: FormData): Promise<AppK
 
   const rawKey = createRawAppAccessKey();
   const trial = buildAppAccessTrialWindow();
+  const subscription = await prisma.familySubscription.findUnique({
+    where: { familyId: session.familyId },
+    select: { status: true, expiresAt: true },
+  });
 
   await prisma.appAccessKey.create({
     data: {
+      familyId: session.familyId,
       name: name || defaultKeyName(),
       keyHash: hashAppAccessKey(rawKey),
       keyPrefix: makeAppKeyPrefix(rawKey),
       trialStartedAt: trial.trialStartedAt,
       trialEndsAt: trial.trialEndsAt,
+      paidUntil:
+        subscription?.status === "ACTIVE" && subscription.expiresAt > new Date()
+          ? subscription.expiresAt
+          : null,
     },
   });
 
@@ -49,10 +58,10 @@ export async function createAppAccessKeyAction(formData: FormData): Promise<AppK
 }
 
 export async function disableAppAccessKeyAction(id: string): Promise<AppKeyActionResult> {
-  await requireAdminSession();
+  const session = await requireAdminSession();
 
-  const target = await prisma.appAccessKey.findUnique({
-    where: { id },
+  const target = await prisma.appAccessKey.findFirst({
+    where: { id, familyId: session.familyId },
     select: { id: true, isActive: true },
   });
 

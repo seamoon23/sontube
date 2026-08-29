@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { AdminAdSlot } from "@/components/admin/admin-ad-slot";
 import { AdminNav } from "@/components/admin/admin-nav";
+import { ImpersonationBanner } from "@/components/admin/impersonation-banner";
 
 export default function AdminLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
@@ -27,6 +28,7 @@ export default function AdminLayout({ children }: Readonly<{ children: React.Rea
           </div>
         </div>
       </header>
+      <ImpersonationBanner />
       <AdminNav />
       <main id="admin-main" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-8 outline-none md:px-8">
         {children}

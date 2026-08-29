@@ -2,7 +2,14 @@
 <resources>
     <string name="app_name">SonTube</string>
     <string name="external_navigation_blocked">이 앱에서는 외부 페이지를 열 수 없습니다.</string>
-    <string name="load_error_title">영상을 불러오지 못했어요</string>
-    <string name="load_error_description">인터넷 연결과 SonTube 서버 상태를 확인한 뒤 다시 시도해 주세요.</string>
-    <string name="retry">다시 시도</string>
+    <string name="load_error_title">연결 전 샘플 화면</string>
+    <string name="load_error_description">앱 통신 설정 또는 지정된 네트워크를 확인하지 못했습니다. 실제 승인 목록과 플레이어는 연결 전까지 숨깁니다.</string>
+    <string name="sample_list_title">화면 검수용 샘플 · 재생 안 됨</string>
+    <string name="sample_card_animals">🐿️ 숲속 동물 관찰  ·  동물 / 자연  ·  4:12</string>
+    <string name="sample_card_science">🪐 별과 행성 여행  ·  과학 / 우주  ·  5:30</string>
+    <string name="sample_card_making">✂️ 색종이 동물 만들기  ·  만들기  ·  8:20</string>
+    <string name="sample_card_english">🎵 인사말 영어 노래  ·  영어 / 음악  ·  3:10</string>
+    <string name="sample_card_exercise">🤸 아침 쭉쭉 스트레칭  ·  운동  ·  7:00</string>
+    <string name="sample_card_travel">🚂 기차로 떠나는 작은 여행  ·  여행 / 풍경  ·  9:15</string>
+    <string name="retry">연결 다시 확인</string>
 </resources>

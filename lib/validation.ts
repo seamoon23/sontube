@@ -1,19 +1,47 @@
 import { z } from "zod";
+import { MAX_CHANNEL_DISPLAY_NAME_LENGTH } from "@/lib/channels";
 
-export const videoClientSchema = z.object({
-  originalUrl: z.string().min(1, "YouTube URL을 입력해 주세요."),
-  title: z.string().min(1, "제목을 입력해 주세요.").max(120, "제목은 120자 이하로 입력해 주세요."),
-  description: z.string().max(2000, "설명은 2000자 이하로 입력해 주세요.").optional(),
-  searchKeywords: z.string().max(500, "검색 키워드는 500자 이하로 입력해 주세요.").optional(),
-  durationText: z.string().max(40, "영상 시간은 40자 이하로 입력해 주세요.").optional(),
-  safetyStatus: z.enum(["PARENT_CHECKED", "NEEDS_REVIEW", "HIDDEN"]),
-  isPublished: z.boolean(),
-  isParentRecommended: z.boolean(),
-  playMode: z.enum(["SINGLE_THEN_CLOSE", "ALLOW_CONTINUE"]),
-  thumbnailType: z.enum(["YOUTUBE", "CUSTOM", "PLACEHOLDER"]),
-  quickNewTags: z.string().optional(),
-  tagIds: z.array(z.string()).optional(),
-});
+export const videoClientSchema = z
+  .object({
+    originalUrl: z.string().min(1, "YouTube URL을 입력해 주세요."),
+    title: z.string().min(1, "제목을 입력해 주세요.").max(120, "제목은 120자 이하로 입력해 주세요."),
+    description: z.string().max(2000, "설명은 2000자 이하로 입력해 주세요.").optional(),
+    searchKeywords: z.string().max(500, "검색 키워드는 500자 이하로 입력해 주세요.").optional(),
+    durationText: z.string().max(40, "영상 시간은 40자 이하로 입력해 주세요.").optional(),
+    channelMode: z.enum(["NONE", "EXISTING", "NEW"]),
+    channelId: z.string().max(128, "채널 선택값을 확인해 주세요.").optional(),
+    newChannelName: z
+      .string()
+      .max(
+        MAX_CHANNEL_DISPLAY_NAME_LENGTH,
+        `채널명은 ${MAX_CHANNEL_DISPLAY_NAME_LENGTH}자 이하로 입력해 주세요.`,
+      )
+      .optional(),
+    safetyStatus: z.enum(["PARENT_CHECKED", "NEEDS_REVIEW", "HIDDEN"]),
+    isPublished: z.boolean(),
+    isParentRecommended: z.boolean(),
+    playMode: z.enum(["SINGLE_THEN_CLOSE", "ALLOW_CONTINUE"]),
+    thumbnailType: z.enum(["YOUTUBE", "CUSTOM", "PLACEHOLDER"]),
+    quickNewTags: z.string().optional(),
+    tagIds: z.array(z.string()).optional(),
+  })
+  .superRefine((input, context) => {
+    if (input.channelMode === "EXISTING" && !input.channelId?.trim()) {
+      context.addIssue({
+        code: "custom",
+        message: "기존 채널을 선택해 주세요.",
+        path: ["channelId"],
+      });
+    }
+
+    if (input.channelMode === "NEW" && !input.newChannelName?.trim()) {
+      context.addIssue({
+        code: "custom",
+        message: "새 채널명을 입력해 주세요.",
+        path: ["newChannelName"],
+      });
+    }
+  });
 
 export const tagFormSchema = z.object({
   name: z.string().min(1, "태그 이름을 입력해 주세요.").max(40, "태그 이름은 40자 이하로 입력해 주세요."),

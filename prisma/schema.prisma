@@ -34,9 +34,91 @@ enum KidsSignalType {
   PLAYLIST
 }
 
+enum PaymentRequestStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  EXPIRED
+  REFUND_REQUESTED
+  REFUNDED
+  PARTIAL_REFUNDED
+}
+
+enum FamilySubscriptionStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum SubscriptionGrantStatus {
+  ACTIVE
+  CANCELLED
+}
+
+enum PaymentRefundStatus {
+  REQUESTED
+  COMPLETED
+  REJECTED
+}
+
+enum PaymentActorType {
+  PARENT
+  SUPERADMIN
+  SYSTEM
+}
+
+enum PaymentAuditAction {
+  PAYMENT_REQUESTED
+  PAYMENT_CONFIRMED
+  PAYMENT_REJECTED
+  PAYMENT_EXPIRED
+  REFUND_REQUESTED
+  REFUND_REJECTED
+  REFUND_COMPLETED
+  SUBSCRIPTION_CREATED
+  SUBSCRIPTION_EXTENDED
+  ADMIN_MEMO_UPDATED
+}
+
+model Family {
+  id              String              @id @default(cuid())
+  name            String
+  wifiRequired    Boolean             @default(true)
+  isActive        Boolean             @default(true)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  users           ParentUser[]
+  videos          Video[]
+  channels        Channel[]
+  tags            Tag[]
+  appAccessKeys   AppAccessKey[]
+  paymentRequests PaymentRequest[]
+  subscription    FamilySubscription?
+  grants          SubscriptionGrant[]
+}
+
+model ParentUser {
+  id               String          @id @default(cuid())
+  familyId         String
+  email            String          @unique
+  displayName      String
+  passwordHash     String
+  isActive         Boolean         @default(true)
+  lastLoginAt      DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  family           Family          @relation(fields: [familyId], references: [id], onDelete: Restrict)
+  paymentRequests  PaymentRequest[]
+  requestedRefunds PaymentRefund[] @relation("RefundRequestedBy")
+
+  @@index([familyId])
+}
+
 model Video {
   id                  String        @id @default(cuid())
-  youtubeVideoId      String        @unique
+  familyId            String?
+  channelId           String?
+  youtubeVideoId      String
   originalUrl          String
   title               String
   description         String?
@@ -52,14 +134,36 @@ model Video {
   playMode            PlayMode      @default(SINGLE_THEN_CLOSE)
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
+  family              Family?       @relation(fields: [familyId], references: [id], onDelete: Restrict)
+  channel             Channel?      @relation(fields: [channelId], references: [id], onDelete: SetNull)
   tags                VideoTag[]
   kidSignals          KidsVideoSignal[]
+
+  @@unique([familyId, youtubeVideoId])
+  @@index([familyId])
+  @@index([channelId])
+}
+
+model Channel {
+  id             String   @id @default(cuid())
+  familyId       String
+  displayName    String
+  normalizedName String
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  family         Family   @relation(fields: [familyId], references: [id], onDelete: Restrict)
+  videos         Video[]
+
+  @@unique([familyId, normalizedName])
+  @@index([familyId, isActive])
 }
 
 model Tag {
   id          String     @id @default(cuid())
+  familyId    String?
   name        String
-  slug        String     @unique
+  slug        String
   color       String?
   icon        String?
   description String?
@@ -69,7 +173,11 @@ model Tag {
   lastUsedAt  DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+  family      Family?    @relation(fields: [familyId], references: [id], onDelete: Restrict)
   videos      VideoTag[]
+
+  @@unique([familyId, slug])
+  @@index([familyId])
 }
 
 model VideoTag {
@@ -99,10 +207,11 @@ model KidsVideoSignal {
 
 model AppAccessKey {
   id             String    @id @default(cuid())
+  familyId       String?
   name           String
   keyHash        String    @unique
   keyPrefix      String
-  installationId String?
+  installationId String?   @unique
   isActive       Boolean   @default(true)
   trialStartedAt DateTime  @default(now())
   trialEndsAt    DateTime
@@ -111,9 +220,10 @@ model AppAccessKey {
   registeredAt   DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  family         Family?   @relation(fields: [familyId], references: [id], onDelete: Restrict)
 
   @@index([keyPrefix])
-  @@index([installationId])
+  @@index([familyId])
   @@index([trialEndsAt])
   @@index([paidUntil])
 }
@@ -124,4 +234,143 @@ model AppSetting {
   value     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model PaymentPlan {
+  id           String           @id @default(cuid())
+  code         String           @unique
+  name         String
+  description  String?
+  priceKrw     Int
+  durationDays Int
+  isActive     Boolean          @default(false)
+  displayOrder Int              @default(0)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  requests     PaymentRequest[]
+}
+
+model PaymentRequest {
+  id                   String               @id @default(cuid())
+  requestNo            String               @unique
+  familyId             String
+  requestedById        String
+  planId               String
+  planCodeSnapshot     String
+  planNameSnapshot     String
+  amountKrw            Int
+  durationDaysSnapshot Int
+  depositorName        String
+  expectedDepositDate  String?
+  requestedAt          DateTime             @default(now())
+  status               PaymentRequestStatus @default(PENDING)
+  pendingKey           String?              @unique
+  confirmedAt          DateTime?
+  confirmedBy          String?
+  receivedAmountKrw    Int?
+  receivedDate         String?
+  rejectedAt           DateTime?
+  rejectedBy           String?
+  expiredAt            DateTime?
+  refundRequestedAt    DateTime?
+  refundedAt           DateTime?
+  refundedBy           String?
+  refundAmountKrw      Int                  @default(0)
+  userMemo             String?
+  adminMemo            String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  family               Family               @relation(fields: [familyId], references: [id], onDelete: Restrict)
+  requestedBy          ParentUser           @relation(fields: [requestedById], references: [id], onDelete: Restrict)
+  plan                 PaymentPlan          @relation(fields: [planId], references: [id], onDelete: Restrict)
+  grant                SubscriptionGrant?
+  refunds              PaymentRefund[]
+  auditLogs            PaymentAuditLog[]
+
+  @@index([familyId, status])
+  @@index([requestedById, requestedAt])
+  @@index([requestedAt])
+}
+
+model FamilySubscription {
+  id        String                   @id @default(cuid())
+  familyId  String                   @unique
+  startsAt  DateTime
+  expiresAt DateTime
+  status    FamilySubscriptionStatus @default(ACTIVE)
+  version   Int                      @default(1)
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+  family    Family                   @relation(fields: [familyId], references: [id], onDelete: Restrict)
+  grants    SubscriptionGrant[]
+}
+
+model SubscriptionGrant {
+  id               String                  @id @default(cuid())
+  familyId         String
+  subscriptionId   String
+  paymentRequestId String                  @unique
+  startsAt         DateTime
+  expiresAt        DateTime
+  durationDays     Int
+  status           SubscriptionGrantStatus @default(ACTIVE)
+  cancelledAt      DateTime?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  family           Family                  @relation(fields: [familyId], references: [id], onDelete: Restrict)
+  subscription     FamilySubscription      @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  paymentRequest   PaymentRequest          @relation(fields: [paymentRequestId], references: [id], onDelete: Restrict)
+
+  @@index([familyId, status])
+  @@index([subscriptionId, expiresAt])
+}
+
+model PaymentRefund {
+  id               String              @id @default(cuid())
+  paymentRequestId String
+  requestedById    String?
+  status           PaymentRefundStatus @default(REQUESTED)
+  amountKrw        Int
+  reason           String?
+  requestedAt      DateTime            @default(now())
+  processedAt      DateTime?
+  processedBy      String?
+  adminMemo        String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  paymentRequest   PaymentRequest      @relation(fields: [paymentRequestId], references: [id], onDelete: Restrict)
+  requestedBy      ParentUser?         @relation("RefundRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+
+  @@index([paymentRequestId, status])
+  @@index([requestedById])
+}
+
+model PaymentAuditLog {
+  id               String                @id @default(cuid())
+  paymentRequestId String
+  actorType        PaymentActorType
+  actorId          String?
+  action           PaymentAuditAction
+  previousStatus   PaymentRequestStatus?
+  nextStatus       PaymentRequestStatus?
+  memo             String?
+  createdAt        DateTime              @default(now())
+  paymentRequest   PaymentRequest        @relation(fields: [paymentRequestId], references: [id], onDelete: Restrict)
+
+  @@index([paymentRequestId, createdAt])
+  @@index([actorType, actorId])
+}
+
+model SuperAdminAuditLog {
+  id             String   @id @default(cuid())
+  action         String
+  actorId        String
+  targetFamilyId String?
+  targetUserId   String?
+  metadataJson   String?
+  createdAt      DateTime @default(now())
+
+  @@index([action, createdAt])
+  @@index([targetFamilyId])
+  @@index([targetUserId])
 }

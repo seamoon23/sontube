@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/surface">
+    tools:ignore="MergeRootFrame">
 
     <WebView
         android:id="@+id/web_view"
@@ -21,38 +22,120 @@
         android:progressTint="@color/ocean"
         android:visibility="gone" />
 
-    <LinearLayout
+    <ScrollView
         android:id="@+id/error_panel"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:padding="32dp"
+        android:background="@color/surface"
+        android:fillViewport="true"
         android:visibility="gone">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center"
-            android:text="@string/load_error_title"
-            android:textColor="@color/ink"
-            android:textSize="22sp"
-            android:textStyle="bold" />
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:padding="24dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:gravity="center"
-            android:text="@string/load_error_description"
-            android:textColor="@color/muted"
-            android:textSize="15sp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="@string/load_error_title"
+                android:textColor="@color/ink"
+                android:textSize="22sp"
+                android:textStyle="bold" />
 
-        <Button
-            android:id="@+id/retry_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="@string/retry" />
-    </LinearLayout>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center"
+                android:text="@string/load_error_description"
+                android:textColor="@color/muted"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:text="@string/sample_list_title"
+                android:textColor="@color/ink"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@color/white"
+                android:elevation="1dp"
+                android:padding="14dp"
+                android:text="@string/sample_card_animals"
+                android:textColor="@color/ink"
+                android:textSize="15sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@color/white"
+                android:elevation="1dp"
+                android:padding="14dp"
+                android:text="@string/sample_card_science"
+                android:textColor="@color/ink"
+                android:textSize="15sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@color/white"
+                android:elevation="1dp"
+                android:padding="14dp"
+                android:text="@string/sample_card_making"
+                android:textColor="@color/ink"
+                android:textSize="15sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@color/white"
+                android:elevation="1dp"
+                android:padding="14dp"
+                android:text="@string/sample_card_english"
+                android:textColor="@color/ink"
+                android:textSize="15sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@color/white"
+                android:elevation="1dp"
+                android:padding="14dp"
+                android:text="@string/sample_card_exercise"
+                android:textColor="@color/ink"
+                android:textSize="15sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@color/white"
+                android:elevation="1dp"
+                android:padding="14dp"
+                android:text="@string/sample_card_travel"
+                android:textColor="@color/ink"
+                android:textSize="15sp" />
+
+            <Button
+                android:id="@+id/retry_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/retry" />
+        </LinearLayout>
+    </ScrollView>
 </FrameLayout>

@@ -1,6 +1,6 @@
 import { SafetyStatus, ThumbnailType } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { buildAdminVideoWhere } from "@/lib/admin-video-filters";
+import { buildAdminVideoWhere, UNASSIGNED_CHANNEL_FILTER } from "@/lib/admin-video-filters";
 
 describe("buildAdminVideoWhere", () => {
   it("builds a broad internal search across parent-managed fields", () => {
@@ -10,13 +10,15 @@ describe("buildAdminVideoWhere", () => {
         { description: { contains: "cat" } },
         { searchKeywords: { contains: "cat" } },
         { youtubeVideoId: { contains: "cat" } },
+        { channel: { displayName: { contains: "cat" } } },
       ],
     });
   });
 
-  it("filters by tag and safety/publication status", () => {
-    expect(buildAdminVideoWhere({ tagId: "tag-1", status: "published" })).toEqual({
+  it("filters by tag, channel, and safety/publication status", () => {
+    expect(buildAdminVideoWhere({ tagId: "tag-1", channelId: "channel-1", status: "published" })).toEqual({
       tags: { some: { tagId: "tag-1" } },
+      channelId: "channel-1",
       isPublished: true,
       safetyStatus: SafetyStatus.PARENT_CHECKED,
     });
@@ -27,6 +29,12 @@ describe("buildAdminVideoWhere", () => {
 
     expect(buildAdminVideoWhere({ status: "hidden" })).toEqual({
       safetyStatus: SafetyStatus.HIDDEN,
+    });
+  });
+
+  it("supports finding legacy videos without a channel", () => {
+    expect(buildAdminVideoWhere({ channelId: UNASSIGNED_CHANNEL_FILTER })).toEqual({
+      channelId: null,
     });
   });
 

@@ -1,5 +1,47 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {};
+const securityHeaders = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+  },
+] as const;
+
+const restrictedRouteHeaders = [
+  {
+    key: "X-Robots-Tag",
+    value: "noindex, nofollow, noarchive, nosnippet, noimageindex",
+  },
+  {
+    key: "Cache-Control",
+    value: "private, no-store, max-age=0, must-revalidate",
+  },
+] as const;
+
+const restrictedRouteSources = [
+  "/admin/:path*",
+  "/superadmin/:path*",
+  "/app/:path*",
+  "/kids/:path*",
+  "/api/:path*",
+] as const;
+
+const nextConfig: NextConfig = {
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [...securityHeaders],
+      },
+      ...restrictedRouteSources.map((source) => ({
+        source,
+        headers: [...restrictedRouteHeaders],
+      })),
+    ];
+  },
+};
 
 export default nextConfig;
