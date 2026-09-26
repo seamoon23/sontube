@@ -13,6 +13,10 @@ import {
 import { resolveManagedCustomThumbnailPath, validateCustomThumbnailFile } from "@/lib/custom-thumbnail";
 import { prisma } from "@/lib/db";
 import { requireAdminSession } from "@/lib/admin-session";
+import {
+  IMPERSONATION_READ_ONLY_MESSAGE,
+  isAdminMutationBlocked,
+} from "@/lib/admin-mutation-guard";
 import { splitTagNames, slugifyTagName } from "@/lib/tags";
 import { buildYouTubeThumbnailUrl, parseYouTubeVideoId } from "@/lib/youtube";
 import { tagFormSchema, videoClientSchema } from "@/lib/validation";
@@ -25,6 +29,9 @@ export type ActionResult = {
 const THUMBNAIL_UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "thumbnails");
 export async function createVideoAction(formData: FormData): Promise<ActionResult> {
   const session = await requireAdminSession();
+  if (isAdminMutationBlocked(session)) {
+    return { ok: false, message: IMPERSONATION_READ_ONLY_MESSAGE };
+  }
 
   const input = readVideoFormData(formData);
   const parsed = videoClientSchema.safeParse(input);
@@ -86,6 +93,8 @@ export async function createVideoAction(formData: FormData): Promise<ActionResul
         customThumbnailPath: thumbnail.value.customThumbnailPath,
         safetyStatus: parsed.data.safetyStatus as SafetyStatus,
         isPublished: parsed.data.isPublished,
+        isLitePublished: parsed.data.isLitePublished,
+        liteSortOrder: parsed.data.liteSortOrder,
         isParentRecommended: parsed.data.isParentRecommended,
         parentRecommendedAt: parsed.data.isParentRecommended ? new Date() : null,
         playMode: parsed.data.playMode as PlayMode,
@@ -106,6 +115,9 @@ export async function createVideoAction(formData: FormData): Promise<ActionResul
 
 export async function updateVideoAction(videoId: string, formData: FormData): Promise<ActionResult> {
   const session = await requireAdminSession();
+  if (isAdminMutationBlocked(session)) {
+    return { ok: false, message: IMPERSONATION_READ_ONLY_MESSAGE };
+  }
 
   const existing = await prisma.video.findFirst({
     where: { id: videoId, familyId: session.familyId },
@@ -183,6 +195,8 @@ export async function updateVideoAction(videoId: string, formData: FormData): Pr
         customThumbnailPath: thumbnail.value.customThumbnailPath,
         safetyStatus: parsed.data.safetyStatus as SafetyStatus,
         isPublished: parsed.data.isPublished,
+        isLitePublished: parsed.data.isLitePublished,
+        liteSortOrder: parsed.data.liteSortOrder,
         isParentRecommended: parsed.data.isParentRecommended,
         parentRecommendedAt:
           parsed.data.isParentRecommended && !existing.isParentRecommended ? new Date() : existing.parentRecommendedAt,
@@ -209,6 +223,9 @@ export async function updateVideoAction(videoId: string, formData: FormData): Pr
 
 export async function createTagAction(formData: FormData): Promise<ActionResult> {
   const session = await requireAdminSession();
+  if (isAdminMutationBlocked(session)) {
+    return { ok: false, message: IMPERSONATION_READ_ONLY_MESSAGE };
+  }
 
   const parsed = tagFormSchema.safeParse(readTagFormData(formData));
   if (!parsed.success) {
@@ -243,6 +260,9 @@ export async function createTagAction(formData: FormData): Promise<ActionResult>
 
 export async function updateTagAction(tagId: string, formData: FormData): Promise<ActionResult> {
   const session = await requireAdminSession();
+  if (isAdminMutationBlocked(session)) {
+    return { ok: false, message: IMPERSONATION_READ_ONLY_MESSAGE };
+  }
 
   const target = await prisma.tag.findFirst({
     where: { id: tagId, familyId: session.familyId },
@@ -297,6 +317,8 @@ function readVideoFormData(formData: FormData) {
     newChannelName: String(formData.get("newChannelName") ?? ""),
     safetyStatus: String(formData.get("safetyStatus") ?? "NEEDS_REVIEW"),
     isPublished: formData.get("isPublished") === "on",
+    isLitePublished: formData.get("isLitePublished") === "on",
+    liteSortOrder: String(formData.get("liteSortOrder") ?? "0"),
     isParentRecommended: formData.get("isParentRecommended") === "on",
     playMode: String(formData.get("playMode") ?? "SINGLE_THEN_CLOSE"),
     thumbnailType: String(formData.get("thumbnailType") ?? "YOUTUBE"),
@@ -539,6 +561,8 @@ function revalidateVideoPaths() {
   revalidatePath("/admin");
   revalidatePath("/admin/videos");
   revalidatePath("/kids");
+  revalidatePath("/lite");
+  revalidatePath("/api/lite/catalog");
 }
 
 function revalidateTagPaths() {

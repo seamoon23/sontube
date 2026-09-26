@@ -4,13 +4,13 @@
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
     tools:ignore="MergeRootFrame">
 
     <WebView
         android:id="@+id/web_view"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:contentDescription="@string/app_name" />
+        android:layout_height="match_parent" />
 
     <ProgressBar
         android:id="@+id/progress"
@@ -18,6 +18,7 @@
         android:layout_width="match_parent"
         android:layout_height="3dp"
         android:indeterminate="false"
+        android:importantForAccessibility="no"
         android:max="100"
         android:progressTint="@color/ocean"
         android:visibility="gone" />
@@ -28,6 +29,7 @@
         android:layout_height="match_parent"
         android:background="@color/surface"
         android:fillViewport="true"
+        android:scrollbarStyle="outsideOverlay"
         android:visibility="gone">
 
         <LinearLayout
@@ -35,12 +37,19 @@
             android:layout_height="wrap_content"
             android:gravity="center_horizontal"
             android:orientation="vertical"
-            android:padding="24dp">
+            android:paddingStart="@dimen/fallback_horizontal_padding"
+            android:paddingTop="24dp"
+            android:paddingEnd="@dimen/fallback_horizontal_padding"
+            android:paddingBottom="24dp">
 
             <TextView
+                android:id="@+id/error_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:accessibilityLiveRegion="polite"
+                android:breakStrategy="balanced"
                 android:gravity="center"
+                android:lineSpacingExtra="2dp"
                 android:text="@string/load_error_title"
                 android:textColor="@color/ink"
                 android:textSize="22sp"
@@ -50,12 +59,15 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
+                android:breakStrategy="balanced"
                 android:gravity="center"
+                android:lineSpacingExtra="3dp"
                 android:text="@string/load_error_description"
                 android:textColor="@color/muted"
                 android:textSize="14sp" />
 
             <TextView
+                android:id="@+id/sample_list_title"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="22dp"
@@ -68,8 +80,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:background="@color/white"
+                android:background="@drawable/sample_card_background"
+                android:contentDescription="@string/sample_card_animals_a11y"
                 android:elevation="1dp"
+                android:gravity="center_vertical"
+                android:lineSpacingExtra="2dp"
+                android:minHeight="52dp"
                 android:padding="14dp"
                 android:text="@string/sample_card_animals"
                 android:textColor="@color/ink"
@@ -79,8 +95,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:background="@color/white"
+                android:background="@drawable/sample_card_background"
+                android:contentDescription="@string/sample_card_science_a11y"
                 android:elevation="1dp"
+                android:gravity="center_vertical"
+                android:lineSpacingExtra="2dp"
+                android:minHeight="52dp"
                 android:padding="14dp"
                 android:text="@string/sample_card_science"
                 android:textColor="@color/ink"
@@ -90,8 +110,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:background="@color/white"
+                android:background="@drawable/sample_card_background"
+                android:contentDescription="@string/sample_card_making_a11y"
                 android:elevation="1dp"
+                android:gravity="center_vertical"
+                android:lineSpacingExtra="2dp"
+                android:minHeight="52dp"
                 android:padding="14dp"
                 android:text="@string/sample_card_making"
                 android:textColor="@color/ink"
@@ -101,8 +125,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:background="@color/white"
+                android:background="@drawable/sample_card_background"
+                android:contentDescription="@string/sample_card_english_a11y"
                 android:elevation="1dp"
+                android:gravity="center_vertical"
+                android:lineSpacingExtra="2dp"
+                android:minHeight="52dp"
                 android:padding="14dp"
                 android:text="@string/sample_card_english"
                 android:textColor="@color/ink"
@@ -112,8 +140,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:background="@color/white"
+                android:background="@drawable/sample_card_background"
+                android:contentDescription="@string/sample_card_exercise_a11y"
                 android:elevation="1dp"
+                android:gravity="center_vertical"
+                android:lineSpacingExtra="2dp"
+                android:minHeight="52dp"
                 android:padding="14dp"
                 android:text="@string/sample_card_exercise"
                 android:textColor="@color/ink"
@@ -123,8 +155,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:background="@color/white"
+                android:background="@drawable/sample_card_background"
+                android:contentDescription="@string/sample_card_travel_a11y"
                 android:elevation="1dp"
+                android:gravity="center_vertical"
+                android:lineSpacingExtra="2dp"
+                android:minHeight="52dp"
                 android:padding="14dp"
                 android:text="@string/sample_card_travel"
                 android:textColor="@color/ink"
@@ -135,6 +171,15 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
+                android:layout_marginBottom="8dp"
+                android:backgroundTint="@color/ocean"
+                android:fontFamily="sans-serif-medium"
+                android:minHeight="48dp"
+                android:minWidth="160dp"
+                android:paddingStart="24dp"
+                android:paddingEnd="24dp"
+                android:textAllCaps="false"
+                android:textColor="@color/white"
                 android:text="@string/retry" />
         </LinearLayout>
     </ScrollView>

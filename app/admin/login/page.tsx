@@ -16,8 +16,8 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
   const setupRequired = params.setup === "1" || !isAdminAuthConfigured(process.env) || !hasParentUser;
 
   return (
-    <div className="w-full">
+    <main className="w-full">
       <LoginForm setupRequired={setupRequired} />
-    </div>
+    </main>
   );
 }

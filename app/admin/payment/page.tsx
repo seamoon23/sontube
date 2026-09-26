@@ -29,7 +29,7 @@ export default async function AdminPaymentPage() {
     <div className="grid gap-6">
       <div>
         <p className="text-sm font-semibold text-ocean">이용권·결제</p>
-        <h1 className="text-2xl font-bold text-ink">계좌이체 이용권</h1>
+        <h2 className="text-2xl font-bold text-ink">계좌이체 이용권</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
           SonTube는 현재 선불 계좌이체로 운영합니다. 자동결제와 자동갱신은 없으며, 입금 확인 후 운영자가 직접 이용권을 활성화합니다.
         </p>
@@ -60,8 +60,8 @@ export default async function AdminPaymentPage() {
         ) : (
           plans.map((plan) => (
             <article key={plan.id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-bold text-ocean">{plan.code}</p>
-              <h2 className="mt-1 text-xl font-bold text-ink">{plan.name}</h2>
+              <p className="break-all text-xs font-bold text-ocean">{plan.code}</p>
+              <h2 className="mt-1 break-words text-xl font-bold text-ink">{plan.name}</h2>
               <p className="mt-2 text-3xl font-black text-ink">{formatKrw(plan.priceKrw)}</p>
               <p className="mt-1 text-sm font-semibold text-slate-600">{plan.durationDays}일 · 입금 확인 후 시작</p>
               {plan.description && <p className="mt-3 text-sm leading-6 text-slate-600">{plan.description}</p>}
@@ -115,11 +115,11 @@ export default async function AdminPaymentPage() {
             {requests.map((request) => (
               <article key={request.id} className="grid gap-3 rounded-md border border-slate-200 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="font-mono text-xs font-bold text-slate-500">{request.requestNo}</p>
-                    <h3 className="mt-1 font-bold text-ink">{request.planNameSnapshot}</h3>
+                  <div className="min-w-0">
+                    <p className="break-all font-mono text-xs font-bold text-slate-500">{request.requestNo}</p>
+                    <h3 className="mt-1 break-words font-bold text-ink">{request.planNameSnapshot}</h3>
                   </div>
-                  <span className={`rounded-md px-2 py-1 text-xs font-bold ${statusClassName(request.status)}`}>
+                  <span className={`shrink-0 whitespace-nowrap rounded-md px-2 py-1 text-xs font-bold ${statusClassName(request.status)}`}>
                     {getManualPaymentStatusLabel(request.status as ManualPaymentStatus)}
                   </span>
                 </div>

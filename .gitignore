@@ -12,6 +12,14 @@ build
 # Prisma local database
 prisma/*.db
 prisma/*.db-journal
+prisma/*.db-shm
+prisma/*.db-wal
+
+# Operational backups contain private application data.
+backups/
+*.sontube-partial-*
+*.sontube-restore-*
+*.sontube-pre-restore-*
 
 # env
 .env

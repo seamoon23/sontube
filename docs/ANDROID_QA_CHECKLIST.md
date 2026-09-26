@@ -1,6 +1,6 @@
 # SonTube Android QA Checklist
 
-Updated: 2026-08-24
+Updated: 2026-08-30
 
 ## Verified baseline
 
@@ -28,6 +28,18 @@ Updated: 2026-08-24
 - [ ] Physical device and manufacturer-specific app pinning
 
 The emulator used one local QA app key and the official YouTube iframe example video. The raw key is not stored in this document or source control.
+
+### Latest emulator regression (2026-08-30)
+
+- Reinstalled the debug APK, cleared only the emulator app data, registered a fresh temporary key and received exactly three approved videos.
+- Relaunch restored the registration and catalog without showing the registration form or a manual refresh/free-trial control.
+- An invalid replacement key returned a registration error while preserving the previous masked prefix and three-item cached catalog.
+- The official YouTube iframe example reached a playing state. Its native custom view filled 1440 x 2560, hid both system bars and returned to `/app` after one Back action.
+- CDP attempts to reach `/admin`, an external HTTPS origin, a new window and a disallowed History API path all remained or recovered at `/app`.
+- Emulator Lock Task reached `PINNED`; Back, Home and Recents kept SonTube top-resumed, and the test explicitly returned Lock Task to `NONE`.
+- Stopping the server before launch produced the native six-item non-playing fallback with no WebView. Restarting the server and tapping `연결 다시 확인` restored the saved three-item catalog.
+- Root Back moved SonTube behind the launcher; relaunch started at `/app` with the saved catalog.
+- Physical cellular/all-network behavior, OEM-specific pinning and release HTTPS routing are still pending on a real device.
 
 ### Latest physical-device readiness check (2026-07-30)
 

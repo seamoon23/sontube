@@ -2,7 +2,29 @@ name: Android Logic CI
 
 on:
   push:
+    paths:
+      - "android-client/**"
+      - "app/api/app/**"
+      - "lib/app-catalog.ts"
+      - "lib/app-sync.ts"
+      - "contracts/**"
+      - "prisma/**"
+      - "scripts/verify-android-logic.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/android-logic-ci.yml"
   pull_request:
+    paths:
+      - "android-client/**"
+      - "app/api/app/**"
+      - "lib/app-catalog.ts"
+      - "lib/app-sync.ts"
+      - "contracts/**"
+      - "prisma/**"
+      - "scripts/verify-android-logic.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/android-logic-ci.yml"
   workflow_dispatch:
 
 permissions:

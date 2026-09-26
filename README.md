@@ -2,7 +2,20 @@
 
 SonTube는 부모가 PC·모바일 웹에서 안전 영상을 관리하고, 아이는 주소창 없는 제한형 Android 앱에서 승인 영상만 고르는 가족용 영상서랍 MVP입니다.
 
+## 공개 화면과 보호 화면
+
+- `/`: 부모가 서비스 목적과 사용 흐름을 확인하는 공개 소개 화면
+- `/lite`: 운영자가 명시적으로 Lite 공개한 안전 승인 영상만 사용하는 읽기 전용 공용 체험
+- `/admin`: `ADMIN_ALLOWED_EMAILS`에 등록된 운영 보호자 두 계정만 사용하는 관리 화면
+- `/superadmin`: 별도 `SUPERADMIN_*` 자격 증명을 가진 소유자 한 명의 운영 화면
+- `/app`: 앱 키·설치 ID와 가족 정책을 사용하는 Android 제한형 클라이언트 화면
+- `/api/health`: DB 읽기 가능 여부만 200/503으로 반환하는 no-store 운영 헬스체크
+
+Lite는 제목·보호자 키워드 검색, 태그·채널 필터, 같은 채널의 공개 영상 보기, YouTube iframe 재생·전체 화면과 브라우저 로컬 내 목록만 제공합니다. 앱 키, 결제, 가족별 데이터, 서버 피드백, Android 기기 잠금과 Wi-Fi 강제 기능은 제공하지 않습니다. 제한형 시청과 가족별 승인 목록은 Android 앱의 책임이며, 초기 Lite는 `noindex`로 운영합니다.
+
 ## 실행 방법
+
+Node.js 22.5 이상을 사용합니다. 현재 웹·운영 도구 검증 기준은 Node.js 22.17.0입니다.
 
 1. `C:\codex\app\sontube` 폴더에서 의존성을 설치합니다.
 
@@ -16,7 +29,7 @@ npm install
 copy .env.example .env
 ```
 
-3. 보호자와 최종관리자 비밀번호 해시를 각각 만듭니다.
+3. 보호자와 최종관리자 비밀번호 해시를 각각 만들고 관리자 이메일 allowlist를 설정합니다.
 
 PowerShell에서 `C:\codex\app\sontube` 경로로 이동합니다. 두 계정은 서로 다른 비밀번호와 세션 비밀키를 사용하세요.
 
@@ -26,6 +39,8 @@ npm run auth:hash -- <superadmin-password> <SUPERADMIN_SESSION_SECRET>
 ```
 
 첫 해시는 `.env`의 `ADMIN_PASSWORD_HASH`, 두 번째 해시는 `SUPERADMIN_PASSWORD_HASH`에 넣습니다. 보호자 이메일은 `PARENT_BOOTSTRAP_EMAIL`, 최종관리자 ID는 `SUPERADMIN_LOGIN_ID`로 설정합니다.
+
+`.env`의 `ADMIN_ALLOWED_EMAILS`에는 실제 운영 보호자 이메일 두 개만 쉼표로 구분해 넣습니다. bootstrap 이메일도 이 목록에 있어야 합니다. 첫 계정을 seed한 뒤 두 번째 계정은 브라우저에서 `최종관리자 > 사용자`(`/superadmin/users`)로 이동해 만들고, 두 이메일 모두 활성 `ParentUser`인지 확인합니다. 실제 이메일이나 비밀번호는 저장소·문서·채팅에 기록하지 않습니다.
 
 4. SQLite DB와 Prisma Client를 준비합니다.
 
@@ -50,6 +65,8 @@ npm run dev:lan
 
 6. 브라우저에서 접근합니다.
 
+- 부모용 공개 소개: `http://127.0.0.1:3000/`
+- 공개 Lite 체험: `http://127.0.0.1:3000/lite`
 - 관리자: `http://127.0.0.1:3000/admin`
 - 관리자 로그인: `http://127.0.0.1:3000/admin/login`
 - 영상 등록: `http://127.0.0.1:3000/admin/videos/new`
@@ -59,11 +76,14 @@ npm run dev:lan
 - 이용권·결제: `http://127.0.0.1:3000/admin/payment`
 - 최종관리자: `http://127.0.0.1:3000/superadmin/login`
 - Android 앱에 표시되는 콘텐츠 화면: `http://127.0.0.1:3000/app`
-- 브라우저 QA용 아이 화면: `http://127.0.0.1:3000/kids`
+- 보호자 로그인 후 사용하는 브라우저 QA용 아이 화면: `http://127.0.0.1:3000/kids`
 
 ## 구현된 기능
 
 - 관리자 영상 등록, 수정, 목록
+- 관리자 이메일 allowlist와 활성 보호자 계정을 함께 확인하는 이중 관리자 로그인 제한
+- 운영자가 별도로 Lite 공개한 안전 승인 영상만 반환하는 공개 카탈로그 API
+- 가족 ID·원본 URL·앱 키·결제 데이터를 제외한 Lite 카탈로그, ETag와 최대 60초 CDN 캐시
 - 관리자 영상 목록의 검색, 채널, 태그, 상태, 부모 추천, 썸네일 필터
 - 가족별 채널 마스터와 영상의 선택적 `channelId` 연결
 - 영상 등록·수정 시 기존 채널 선택 또는 보호자가 새 채널명 직접 입력
@@ -108,7 +128,9 @@ npm run dev:lan
 - 앱 키·설치 ID의 cloud backup·기기 이전 차단과 기본 Android 런처 아이콘
 - 중요 로그인·동기화·결제 요청의 상한형 프로세스 로컬 rate limit
 - 웹 보안 응답 헤더와 빈 DB migration까지 포함한 통합 검증 스크립트·GitHub Actions
-- 관리자·아이·API 응답의 검색 색인 차단과 private no-store 처리
+- Lite 공개 API를 제외한 관리자·아이·보호 API 응답의 검색 색인 차단과 private no-store 처리
+- Lite 성공 응답 JSON Schema·200/304/503 캐시 계약 자동 검증과 weak ETag 재검증
+- 보호자 세션 버전 폐기와 읽기 전용 최종관리자 대체 로그인
 - Gradle Wrapper와 릴리스 HTTPS 주소 빌드 검증
 
 ## 미구현/후순위 기능
@@ -150,12 +172,18 @@ npm run verify:android:logic
 npm run build
 ```
 
-웹 검증은 `.github\workflows\web-ci.yml`, Android 정책 검증은 `.github\workflows\android-logic-ci.yml`에서 push와 pull request마다 각각 실행됩니다.
+웹 검증은 `.github\workflows\web-ci.yml`, Android 정책 검증은 `.github\workflows\android-logic-ci.yml`에서 push와 pull request마다 각각 실행됩니다. Android debug APK는 `.github\workflows\android-debug-apk.yml`에서 Android 파일 변경 시 별도로 lint·빌드되며, 웹을 배포하거나 스토어용 릴리스를 만들지는 않습니다.
+
+GitHub에서 debug APK를 수동 생성할 때는 `SonTube 저장소 > Actions > Android Debug APK > Run workflow`로 이동합니다. 완료된 실행의 `Artifacts > sontube-android-debug-only-<commit SHA>`에서 APK를 내려받습니다. artifact는 Android 기본 debug signing만 사용하며 14일 뒤 만료됩니다.
 
 수동 확인 경로:
 
 - `관리자 > 영상 등록`: YouTube 영상 URL을 입력하고 `videoId`가 표시되는지 확인
+- `공개 화면 > Lite 체험`: 명시적으로 Lite 공개한 영상만 나타나고 공개 영상이 0개일 때 샘플 대신 빈 상태가 나타나는지 확인
+- `공개 화면 > Lite 체험`: 검색·태그·채널 필터, 같은 채널 더보기, 재생·전체 화면과 로컬 내 목록이 동작하는지 확인
+- `공개 화면 > Lite 체험`: 앱 키·결제·서버 피드백·가족 데이터·Wi-Fi 정책 UI가 없는지 확인
 - `관리자 > 로그인`: `.env`에 설정한 비밀번호로 로그인되는지 확인
+- `관리자 > 로그인`: allowlist에 없는 활성 `ParentUser`도 로그인할 수 없고, 등록된 두 이메일은 각자 로그인되는지 확인
 - `관리자 > 영상 등록`: 채널 URL, 플레이리스트 URL, 검색 URL이 거부되는지 확인
 - `관리자 > 영상 등록/수정`: 기존 채널을 선택하거나 새 채널명을 직접 입력할 수 있는지 확인
 - `관리자 > 채널`: 채널 이름 변경, 신규 선택 비활성화, 중복 채널 병합과 채널별 영상 바로가기가 동작하는지 확인
@@ -194,6 +222,33 @@ npm run build
 - 관리자 접근 경로 `관리자 화면 > 대시보드 > 앱 접속 정책`에서 목록 수신 환경을 `Wi-Fi만` 또는 `Wi-Fi + 모바일 데이터`로 정합니다.
 - 앱이 통신 정책을 확인하지 못하면 `Wi-Fi 필수=true`로 처리하고 실제 목록 대신 재생되지 않는 샘플 화면을 표시합니다.
 
+## 배포 방향
+
+웹과 `android-client/`는 당분간 이 저장소 하나에서 관리합니다. 다만 웹 운영 배포와 Android APK/AAB 산출물은 독립된 CI 작업과 승인 절차로 운영합니다. Web CI, Android 로직 CI와 Android debug APK CI는 서로 다른 변경 경로로 실행됩니다. debug artifact는 Android 기본 debug signing만 사용하며 스토어 배포용 릴리스가 아닙니다.
+
+현재 코드는 동적 Next.js 서버, Prisma/SQLite 쓰기와 `public/uploads/thumbnails/` 로컬 파일 쓰기에 의존하므로 Cloudflare Pages 정적 사이트로 그대로 배포할 수 없습니다. 1차 운영은 영구 디스크가 있는 단일 Node 서버에 배포하고 Cloudflare DNS·TLS·Access를 앞단에 둡니다. SQLite DB와 커스텀 썸네일 폴더는 앱 쓰기를 멈춘 같은 시점으로 백업하고 복구 시험을 해야 합니다. 실행 명령과 접근 경로는 `docs/OPERATIONS_RUNBOOK.md`를 따릅니다.
+
+후속 전환은 아래 순서로 진행합니다.
+
+1. SonTube 전용 Supabase 프로젝트에 PostgreSQL schema와 가족별 RLS를 준비합니다.
+2. 보호자 Auth, 앱 키·동기화·결제용 권한 함수, 커스텀 썸네일 Storage를 서비스 전용 경계로 옮깁니다.
+3. 기존 SQLite 행 수·관계와 업로드 파일을 검증하며 이관합니다.
+4. 웹을 정적 SPA/PWA로 재구성하고 SonTube 전용 Cloudflare Pages 프로젝트에 배포합니다.
+5. `SONTUBE_RELEASE_APP_URL=https://<운영-도메인>/app`으로 Android 릴리스를 다시 빌드하고 실제 기기 회귀 QA를 합니다.
+
+Cloudflare 계정과 `jjunybox.com` DNS 존만 다른 서비스와 공유합니다. Museum·Arcade 또는 다른 서비스의 저장소, Pages 프로젝트, Supabase 프로젝트, 데이터와 service role은 공유하지 않습니다.
+
+### Cloudflare Access 수동 설정
+
+시작 위치는 Cloudflare Dashboard의 `Zero Trust > Access controls > Applications`입니다. `Create new application > Self-hosted and private > Add public hostname`으로 이동합니다. 공식 경로 설명은 [Cloudflare self-hosted application 문서](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/)와 [Application paths 문서](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/app-paths/)를 함께 확인합니다.
+
+1. `SonTube Admin` 애플리케이션을 만들고 운영 도메인의 `/admin`, `/admin/*`, `/api/admin`, `/api/admin/*`, `/kids`, `/kids/*`를 등록합니다. `Allow` 정책의 `Include > Emails`에는 `ADMIN_ALLOWED_EMAILS`와 같은 두 이메일만 넣습니다.
+2. `SonTube Superadmin` 애플리케이션을 별도로 만들고 `/superadmin`, `/superadmin/*`를 등록합니다. `Allow` 정책에는 소유자 이메일 하나만 넣습니다.
+3. 호스트 전체를 보호하는 광범위한 Access 애플리케이션은 만들지 않습니다. `/`, `/lite`, `/api/lite/*`, `/app`, `/api/app/*`는 Access 로그인 없이 열려야 합니다. 특히 Android 시작 정책과 앱 키 API 앞에 이메일 로그인을 두면 앱이 구동되지 않습니다.
+4. 경로 와일드카드는 부모 경로 자체를 포함하지 않으므로 `admin`과 `admin/*`처럼 두 경로를 모두 등록합니다. 더 구체적인 경로 정책이 우선 적용되므로 저장 후 각 URL을 직접 확인합니다.
+5. 시크릿 창에서 공개 경로는 로그인 없이 열리고, 관리자 경로는 등록된 이메일만 통과하며, 최종관리자 경로는 소유자만 통과하는지 확인합니다. Cloudflare Access를 통과해도 SonTube 자체 로그인은 계속 요구되어야 합니다.
+6. 원본 서버 주소나 대체 배포 도메인으로 Access를 우회할 수 없는지 확인합니다. 공개 원본이 남아 있으면 Cloudflare Tunnel의 Access 보호 또는 원본의 Access 토큰 검증을 추가합니다.
+
 ## 광고/결제 방향
 
 - 아이가 사용하는 `/app` 화면에는 광고를 넣지 않습니다.
@@ -210,6 +265,7 @@ npm run build
 - `docs/ANDROID_APP_PLAN.md`: 부모 웹/아이 앱 구분과 Android 제한 범위
 - `docs/MONETIZATION_NOTES.md`: 14일 체험과 광고 정책 메모
 - `docs/MANUAL_PAYMENT_OPERATION.md`: 사업용 계좌이체, 최종관리자 처리, 환불과 배포 환경변수
+- `docs/OPERATIONS_RUNBOOK.md`: 운영 사전점검, 헬스체크, SQLite·썸네일 백업/검증/복구 절차
 
 ## 앱 래퍼 주의사항
 

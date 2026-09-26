@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { isAdminEmailAllowed } from "../lib/admin-auth";
 
 const prisma = new PrismaClient();
 const DEFAULT_BOOTSTRAP_EMAIL = "parent@sontube.local";
@@ -109,19 +110,29 @@ async function seedBootstrapFamily(): Promise<string | null> {
   const email =
     process.env.PARENT_BOOTSTRAP_EMAIL?.trim().toLowerCase() ||
     DEFAULT_BOOTSTRAP_EMAIL;
+  if (!isAdminEmailAllowed(email, process.env)) {
+    throw new Error(
+      "PARENT_BOOTSTRAP_EMAIL must be included in ADMIN_ALLOWED_EMAILS before seeding.",
+    );
+  }
   const configuredFamilyName = process.env.PARENT_BOOTSTRAP_FAMILY_NAME?.trim();
   const familyName = configuredFamilyName || DEFAULT_BOOTSTRAP_FAMILY_NAME;
 
   return prisma.$transaction(async (tx) => {
     const existingParent = await tx.parentUser.findUnique({
       where: { email },
-      select: { id: true, familyId: true },
+      select: { id: true, familyId: true, passwordHash: true },
     });
 
     if (existingParent) {
       await tx.parentUser.update({
         where: { id: existingParent.id },
-        data: { passwordHash },
+        data: {
+          passwordHash,
+          ...(existingParent.passwordHash === passwordHash
+            ? {}
+            : { sessionVersion: { increment: 1 } }),
+        },
       });
 
       if (configuredFamilyName) {

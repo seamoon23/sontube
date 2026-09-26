@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">SonTube Lite</title>
+  <desc id="desc">파란 영상서랍 안의 재생 버튼</desc>
+  <rect width="512" height="512" rx="96" fill="#0369a1"/>
+  <rect x="72" y="104" width="368" height="304" rx="48" fill="#e0f2fe"/>
+  <path d="M220 184c0-15 16-25 29-17l116 72c12 8 12 26 0 34l-116 72c-13 8-29-2-29-17V184z" fill="#17202a"/>
+</svg>

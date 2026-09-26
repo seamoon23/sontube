@@ -26,7 +26,15 @@ const restrictedRouteSources = [
   "/superadmin/:path*",
   "/app/:path*",
   "/kids/:path*",
-  "/api/:path*",
+  // Keep every API private by default except the explicitly public Lite API.
+  "/api/((?!lite(?:/|$)).*)",
+] as const;
+
+const publicLiteApiHeaders = [
+  {
+    key: "X-Robots-Tag",
+    value: "noindex, nofollow, noarchive, nosnippet, noimageindex",
+  },
 ] as const;
 
 const nextConfig: NextConfig = {
@@ -40,6 +48,12 @@ const nextConfig: NextConfig = {
         source,
         headers: [...restrictedRouteHeaders],
       })),
+      {
+        // Cache policy is status-aware in the route handler: successful
+        // catalogs are public, while transient failures are never cached.
+        source: "/api/lite/:path*",
+        headers: [...publicLiteApiHeaders],
+      },
     ];
   },
 };

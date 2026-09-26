@@ -8,6 +8,10 @@ import {
   makeAppKeyPrefix,
 } from "@/lib/app-access";
 import { requireAdminSession } from "@/lib/admin-session";
+import {
+  IMPERSONATION_READ_ONLY_MESSAGE,
+  isAdminMutationBlocked,
+} from "@/lib/admin-mutation-guard";
 import { prisma } from "@/lib/db";
 
 export type AppKeyActionResult = {
@@ -19,6 +23,9 @@ export type AppKeyActionResult = {
 
 export async function createAppAccessKeyAction(formData: FormData): Promise<AppKeyActionResult> {
   const session = await requireAdminSession();
+  if (isAdminMutationBlocked(session)) {
+    return { ok: false, message: IMPERSONATION_READ_ONLY_MESSAGE };
+  }
 
   const name = normalizeName(String(formData.get("name") ?? ""));
   if (name.length > 80) {
@@ -59,6 +66,9 @@ export async function createAppAccessKeyAction(formData: FormData): Promise<AppK
 
 export async function disableAppAccessKeyAction(id: string): Promise<AppKeyActionResult> {
   const session = await requireAdminSession();
+  if (isAdminMutationBlocked(session)) {
+    return { ok: false, message: IMPERSONATION_READ_ONLY_MESSAGE };
+  }
 
   const target = await prisma.appAccessKey.findFirst({
     where: { id, familyId: session.familyId },

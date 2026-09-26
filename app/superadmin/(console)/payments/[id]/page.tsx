@@ -43,9 +43,9 @@ export default async function SuperAdminPaymentDetailPage({ params, searchParams
       <FlashMessage notice={query.notice} error={query.error} />
 
       <div>
-        <Link href="/superadmin/payments" className="text-sm font-bold text-teal-800 hover:underline">입금 신청 목록으로</Link>
+        <Link href="/superadmin/payments" className="inline-flex min-h-11 items-center text-sm font-bold text-teal-800 hover:underline">입금 신청 목록으로</Link>
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <h2 className="font-mono text-xl font-black tracking-tight text-slate-950 md:text-2xl">{payment.requestNo}</h2>
+          <h2 className="break-all font-mono text-xl font-black tracking-tight text-slate-950 md:text-2xl">{payment.requestNo}</h2>
           <PaymentStatusBadge status={payment.status} />
         </div>
         <p className="mt-2 text-sm text-slate-600">신청 내용과 실제 입금 정보를 대조한 뒤 처리하세요.</p>
@@ -112,8 +112,8 @@ export default async function SuperAdminPaymentDetailPage({ params, searchParams
                 {payment.auditLogs.map((log) => (
                   <li key={log.id} className="grid gap-1 border-l-2 border-teal-200 pl-3">
                     <p className="text-sm font-bold text-slate-900">{formatPaymentAuditAction(log.action)}</p>
-                    <p className="text-xs text-slate-500">{log.actorType} / {log.actorId || "시스템"} / {formatDateTime(log.createdAt)}</p>
-                    {log.memo && <p className="text-xs leading-5 text-slate-600">{log.memo}</p>}
+                    <p className="break-all text-xs text-slate-500">{log.actorType} / {log.actorId || "시스템"} / {formatDateTime(log.createdAt)}</p>
+                    {log.memo && <p className="break-words text-xs leading-5 text-slate-600">{log.memo}</p>}
                   </li>
                 ))}
               </ol>
@@ -197,7 +197,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Summary({ label, value, detail, mono = false }: { label: string; value: string; detail: string; mono?: boolean }) {
-  return <div className="min-h-28 bg-white p-4"><dt className="text-xs font-bold text-slate-500">{label}</dt><dd className={`mt-2 text-lg font-black text-slate-950 ${mono ? "font-mono" : ""}`}>{value}</dd><p className="mt-1 break-all text-xs text-slate-500">{detail}</p></div>;
+  return <div className="min-w-0 min-h-28 bg-white p-4"><dt className="text-xs font-bold text-slate-500">{label}</dt><dd className={`mt-2 break-words text-lg font-black text-slate-950 ${mono ? "font-mono" : ""}`}>{value}</dd><p className="mt-1 break-all text-xs text-slate-500">{detail}</p></div>;
 }
 
 function Info({ label, value }: { label: string; value: string }) {
@@ -205,7 +205,7 @@ function Info({ label, value }: { label: string; value: string }) {
 }
 
 function Memo({ label, value }: { label: string; value: string | null }) {
-  return <div><p className="text-xs font-bold text-slate-500">{label}</p><p className="mt-1 whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700">{value || "없음"}</p></div>;
+  return <div className="min-w-0"><p className="text-xs font-bold text-slate-500">{label}</p><p className="mt-1 whitespace-pre-wrap break-words rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700">{value || "없음"}</p></div>;
 }
 
 function formatKrw(value: number): string {

@@ -19,6 +19,8 @@ export const videoClientSchema = z
       .optional(),
     safetyStatus: z.enum(["PARENT_CHECKED", "NEEDS_REVIEW", "HIDDEN"]),
     isPublished: z.boolean(),
+    isLitePublished: z.boolean(),
+    liteSortOrder: z.coerce.number().int().min(0, "Lite 정렬순서는 0 이상이어야 합니다.").max(9999),
     isParentRecommended: z.boolean(),
     playMode: z.enum(["SINGLE_THEN_CLOSE", "ALLOW_CONTINUE"]),
     thumbnailType: z.enum(["YOUTUBE", "CUSTOM", "PLACEHOLDER"]),
@@ -39,6 +41,14 @@ export const videoClientSchema = z
         code: "custom",
         message: "새 채널명을 입력해 주세요.",
         path: ["newChannelName"],
+      });
+    }
+
+    if (input.isLitePublished && (!input.isPublished || input.safetyStatus !== "PARENT_CHECKED")) {
+      context.addIssue({
+        code: "custom",
+        message: "Lite 공개 영상은 보호자 확인 완료 및 아이 화면 공개 상태여야 합니다.",
+        path: ["isLitePublished"],
       });
     }
   });

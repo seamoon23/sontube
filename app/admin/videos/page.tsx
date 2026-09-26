@@ -64,7 +64,7 @@ export default async function AdminVideosPage({ searchParams }: VideosPageProps)
         </div>
         <Link
           href="/admin/videos/new"
-          className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+          className="inline-flex min-h-11 items-center rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
         >
           새 영상
         </Link>
@@ -77,12 +77,12 @@ export default async function AdminVideosPage({ searchParams }: VideosPageProps)
             name="q"
             defaultValue={q}
             placeholder="제목, 설명, 채널, videoId"
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
         </label>
         <label className="grid gap-1 text-xs font-semibold text-slate-600">
           태그
-          <select name="tag" defaultValue={tagId} className="rounded-md border border-slate-300 px-3 py-2 text-sm">
+          <select name="tag" defaultValue={tagId} className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm">
             <option value="">모든 태그</option>
             {tags.map((tag) => (
               <option key={tag.id} value={tag.id}>
@@ -96,7 +96,7 @@ export default async function AdminVideosPage({ searchParams }: VideosPageProps)
           <select
             name="channel"
             defaultValue={channelId}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm"
           >
             <option value="">모든 채널</option>
             <option value={UNASSIGNED_CHANNEL_FILTER}>채널 미지정</option>
@@ -109,7 +109,7 @@ export default async function AdminVideosPage({ searchParams }: VideosPageProps)
         </label>
         <label className="grid gap-1 text-xs font-semibold text-slate-600">
           상태
-          <select name="status" defaultValue={status} className="rounded-md border border-slate-300 px-3 py-2 text-sm">
+          <select name="status" defaultValue={status} className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm">
             <option value="">모든 상태</option>
             <option value="published">공개</option>
             <option value="review">검토 필요</option>
@@ -121,7 +121,7 @@ export default async function AdminVideosPage({ searchParams }: VideosPageProps)
           <select
             name="recommended"
             defaultValue={recommended}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm"
           >
             <option value="">전체</option>
             <option value="1">부모 추천</option>
@@ -132,7 +132,7 @@ export default async function AdminVideosPage({ searchParams }: VideosPageProps)
           <select
             name="thumbnail"
             defaultValue={thumbnail}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm"
           >
             <option value="">모든 썸네일</option>
             <option value="YOUTUBE">YouTube 기본</option>
@@ -140,7 +140,7 @@ export default async function AdminVideosPage({ searchParams }: VideosPageProps)
             <option value="PLACEHOLDER">Placeholder</option>
           </select>
         </label>
-        <button type="submit" className="self-end rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
+        <button type="submit" className="min-h-11 self-end rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
           검색
         </button>
       </form>
@@ -155,17 +155,22 @@ export default async function AdminVideosPage({ searchParams }: VideosPageProps)
         {videos.map((video) => (
           <article key={video.id} className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-[180px_1fr_auto]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={getThumbnailUrl(video)} alt="" className="aspect-video w-full rounded-md object-cover" />
+            <img src={getThumbnailUrl(video)} alt="" loading="lazy" decoding="async" className="aspect-video w-full rounded-md object-cover" />
             <div className="grid min-w-0 gap-2">
               <div>
                 <h3 className="break-words text-lg font-semibold text-ink">{video.title}</h3>
                 <p className="break-all text-xs text-slate-500">{video.youtubeVideoId}</p>
               </div>
               <div className="flex flex-wrap gap-2">
+                {video.isLitePublished && (
+                  <span className="rounded-md bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-800">
+                    Lite 공개 · 순서 {video.liteSortOrder}
+                  </span>
+                )}
                 {video.channel ? (
                   <Link
                     href={{ pathname: "/admin/videos", query: { channel: video.channel.id } }}
-                    className="rounded-md bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100"
+                    className="inline-flex min-h-11 items-center rounded-md bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100"
                     title={`${video.channel.displayName} 채널 영상만 보기`}
                   >
                     채널 · {video.channel.displayName}
@@ -179,7 +184,7 @@ export default async function AdminVideosPage({ searchParams }: VideosPageProps)
                   <span
                     key={tag.id}
                     className="rounded-md px-2 py-1 text-xs font-semibold"
-                    style={{ backgroundColor: `${tag.color ?? "#0369a1"}22`, color: tag.color ?? "#0369a1" }}
+                    style={{ backgroundColor: `${tag.color ?? "#0369a1"}22`, color: "#334155" }}
                   >
                     {tag.name}
                   </span>
@@ -194,7 +199,8 @@ export default async function AdminVideosPage({ searchParams }: VideosPageProps)
             <div className="flex items-start justify-end">
               <Link
                 href={`/admin/videos/${video.id}/edit`}
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 hover:border-ocean hover:text-ocean"
+                aria-label={`${video.title} 수정`}
+                className="inline-flex min-h-11 items-center rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 hover:border-ocean hover:text-ocean"
               >
                 수정
               </Link>

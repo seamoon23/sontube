@@ -20,7 +20,7 @@ const paymentLabels: Record<string, string> = {
 
 export function PaymentStatusBadge({ status }: { status: string }) {
   return (
-    <span className={`inline-flex rounded-md border px-2 py-1 text-xs font-bold ${paymentClasses[status] ?? paymentClasses.EXPIRED}`}>
+    <span className={`inline-flex whitespace-nowrap rounded-md border px-2 py-1 text-xs font-bold ${paymentClasses[status] ?? paymentClasses.EXPIRED}`}>
       {paymentLabels[status] ?? status}
     </span>
   );
@@ -28,7 +28,7 @@ export function PaymentStatusBadge({ status }: { status: string }) {
 
 export function ActiveStatusBadge({ active }: { active: boolean }) {
   return (
-    <span className={`inline-flex rounded-md border px-2 py-1 text-xs font-bold ${
+    <span className={`inline-flex whitespace-nowrap rounded-md border px-2 py-1 text-xs font-bold ${
       active
         ? "border-teal-200 bg-teal-50 text-teal-900"
         : "border-slate-300 bg-slate-100 text-slate-700"

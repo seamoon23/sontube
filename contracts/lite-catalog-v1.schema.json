@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sontube:contracts:lite-catalog:v1",
+  "title": "SonTube Lite catalog response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "catalog"],
+  "properties": {
+    "ok": { "const": true },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "generatedAt", "version", "videos"],
+      "properties": {
+        "source": { "const": "LIVE" },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "version": { "type": "string", "pattern": "^[a-f0-9]{24}$" },
+        "videos": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/video" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "video": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "youtubeVideoId",
+        "title",
+        "description",
+        "searchKeywords",
+        "durationText",
+        "thumbnailUrl",
+        "isParentRecommended",
+        "parentRecommendedAt",
+        "updatedAt",
+        "channel",
+        "tags"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "youtubeVideoId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{11}$" },
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": ["string", "null"] },
+        "searchKeywords": { "type": ["string", "null"] },
+        "durationText": { "type": ["string", "null"] },
+        "thumbnailUrl": { "type": "string", "minLength": 1 },
+        "isParentRecommended": { "type": "boolean" },
+        "parentRecommendedAt": { "type": ["string", "null"], "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "channel": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/channel" }
+          ]
+        },
+        "tags": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/tag" }
+        }
+      }
+    },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      }
+    },
+    "tag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "slug", "color", "icon"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "slug": { "type": "string", "minLength": 1 },
+        "color": { "type": ["string", "null"] },
+        "icon": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

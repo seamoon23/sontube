@@ -84,7 +84,7 @@ export default async function AdminKidsInsightsPage({ searchParams }: AdminKidsI
               key={option.value}
               href={`/admin/insights?period=${option.value}`}
               aria-current={period.value === option.value ? "page" : undefined}
-              className={`rounded-md border px-3 py-2 text-sm font-bold ${
+              className={`inline-flex min-h-11 items-center rounded-md border px-3 py-2 text-sm font-bold ${
                 period.value === option.value
                   ? "border-ink bg-ink text-white"
                   : "border-slate-300 bg-white text-slate-700 hover:border-ocean"
@@ -156,8 +156,8 @@ function RankedList({
         <ol className="mt-4 grid gap-3">
           {items.map((item) => (
             <li key={"id" in item ? item.id : item.label} className="flex items-start justify-between gap-3 text-sm">
-              <span className="font-semibold text-slate-700">{"title" in item ? item.title : item.label}</span>
-              <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">{item.count}</span>
+              <span className="min-w-0 break-words font-semibold text-slate-700">{"title" in item ? item.title : item.label}</span>
+              <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">{item.count}</span>
             </li>
           ))}
         </ol>

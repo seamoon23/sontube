@@ -23,26 +23,42 @@ export type ManagedAppAccessKey = {
   createdAt: string;
 };
 
+type PendingAppKeyAction =
+  | { kind: "create" }
+  | { kind: "disable"; id: string }
+  | null;
+
 export function AppKeyManager({ keys }: { keys: ManagedAppAccessKey[] }) {
   const router = useRouter();
   const [result, setResult] = useState<AppKeyActionResult | null>(null);
   const [copied, setCopied] = useState(false);
+  const [pendingAction, setPendingAction] = useState<PendingAppKeyAction>(null);
   const [isPending, startTransition] = useTransition();
 
   function submitCreate(formData: FormData) {
     setCopied(false);
+    setPendingAction({ kind: "create" });
     startTransition(async () => {
-      const next = await createAppAccessKeyAction(formData);
-      setResult(next);
-      if (next.ok) router.refresh();
+      try {
+        const next = await createAppAccessKeyAction(formData);
+        setResult(next);
+        if (next.ok) router.refresh();
+      } finally {
+        setPendingAction(null);
+      }
     });
   }
 
   function submitDisable(id: string) {
+    setPendingAction({ kind: "disable", id });
     startTransition(async () => {
-      const next = await disableAppAccessKeyAction(id);
-      setResult(next);
-      if (next.ok) router.refresh();
+      try {
+        const next = await disableAppAccessKeyAction(id);
+        setResult(next);
+        if (next.ok) router.refresh();
+      } finally {
+        setPendingAction(null);
+      }
     });
   }
 
@@ -53,7 +69,12 @@ export function AppKeyManager({ keys }: { keys: ManagedAppAccessKey[] }) {
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-6" aria-busy={isPending}>
+      {isPending && (
+        <p className="sr-only" role="status" aria-live="polite">
+          앱 키 요청을 처리하고 있습니다.
+        </p>
+      )}
       <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div>
           <p className="text-sm font-semibold text-ocean">앱 연결</p>
@@ -68,15 +89,15 @@ export function AppKeyManager({ keys }: { keys: ManagedAppAccessKey[] }) {
             <input
               name="name"
               placeholder="예: 거실 태블릿, 아들 폰"
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ocean focus:ring-2 focus:ring-sky-100"
+              className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ocean focus:ring-2 focus:ring-sky-100"
             />
           </label>
           <button
             type="submit"
             disabled={isPending}
-            className="self-end rounded-md bg-ink px-4 py-2 text-sm font-bold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-11 self-end rounded-md bg-ink px-4 py-2 text-sm font-bold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            앱 키 생성
+            {pendingAction?.kind === "create" ? "생성 중" : "앱 키 생성"}
           </button>
         </form>
       </section>
@@ -84,6 +105,8 @@ export function AppKeyManager({ keys }: { keys: ManagedAppAccessKey[] }) {
       {result && (
         <section
           role={result.ok ? "status" : "alert"}
+          aria-live={result.ok ? "polite" : "assertive"}
+          aria-atomic="true"
           className={`grid gap-3 rounded-lg border p-4 text-sm ${
             result.ok ? "border-green-200 bg-green-50 text-green-900" : "border-red-200 bg-red-50 text-red-800"
           }`}
@@ -96,7 +119,7 @@ export function AppKeyManager({ keys }: { keys: ManagedAppAccessKey[] }) {
                 <input
                   readOnly
                   value={result.createdKey}
-                  className="rounded-md border border-green-300 bg-white px-3 py-2 font-mono text-xs text-slate-900"
+                  className="min-h-11 rounded-md border border-green-300 bg-white px-3 py-2 font-mono text-xs text-slate-900"
                   onFocus={(event) => event.currentTarget.select()}
                 />
               </label>
@@ -104,11 +127,11 @@ export function AppKeyManager({ keys }: { keys: ManagedAppAccessKey[] }) {
                 <button
                   type="button"
                   onClick={copyCreatedKey}
-                  className="rounded-md border border-green-300 bg-white px-3 py-2 text-xs font-bold text-green-900 hover:border-green-500"
+                  className="min-h-11 rounded-md border border-green-300 bg-white px-3 py-2 text-xs font-bold text-green-900 hover:border-green-500"
                 >
                   복사
                 </button>
-                <span className="text-xs text-green-800">
+                <span className="text-xs text-green-800" aria-live="polite" aria-atomic="true">
                   {copied ? "복사했습니다." : "보안을 위해 원문 키는 다시 조회되지 않습니다."}
                 </span>
               </div>
@@ -141,7 +164,7 @@ export function AppKeyManager({ keys }: { keys: ManagedAppAccessKey[] }) {
                   {key.statusLabel}
                 </span>
               </div>
-              <p className="font-mono text-xs text-slate-500">prefix: {key.keyPrefix}...</p>
+              <p className="break-all font-mono text-xs text-slate-500">prefix: {key.keyPrefix}...</p>
               <dl className="grid gap-2 text-sm text-slate-600 md:grid-cols-3">
                 <Info label="체험 종료" value={formatDate(key.trialEndsAt)} />
                 <Info label="유료 이용" value={key.paidUntil ? formatDate(key.paidUntil) : "미적용"} />
@@ -153,9 +176,16 @@ export function AppKeyManager({ keys }: { keys: ManagedAppAccessKey[] }) {
                 type="button"
                 disabled={isPending || !key.isActive}
                 onClick={() => submitDisable(key.id)}
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm font-bold text-slate-700 hover:border-red-300 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label={`${key.name} 앱 키 ${
+                  pendingAction?.kind === "disable" && pendingAction.id === key.id
+                    ? "비활성화 중"
+                    : "비활성화"
+                }`}
+                className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm font-bold text-slate-700 hover:border-red-300 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                비활성화
+                {pendingAction?.kind === "disable" && pendingAction.id === key.id
+                  ? "비활성화 중"
+                  : "비활성화"}
               </button>
             </div>
           </article>

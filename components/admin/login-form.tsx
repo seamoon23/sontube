@@ -44,7 +44,8 @@ export function LoginForm({ setupRequired }: { setupRequired: boolean }) {
               type="email"
               autoComplete="username"
               aria-invalid={hasError || undefined}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ocean focus:ring-2 focus:ring-sky-100"
+              aria-describedby={hasError ? "admin-login-error" : undefined}
+              className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ocean focus:ring-2 focus:ring-sky-100"
               required
             />
           </label>
@@ -56,7 +57,7 @@ export function LoginForm({ setupRequired }: { setupRequired: boolean }) {
               autoComplete="current-password"
               aria-invalid={hasError || undefined}
               aria-describedby={hasError ? "admin-login-error" : undefined}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ocean focus:ring-2 focus:ring-sky-100"
+              className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ocean focus:ring-2 focus:ring-sky-100"
               required
             />
           </label>
@@ -67,19 +68,29 @@ export function LoginForm({ setupRequired }: { setupRequired: boolean }) {
             </p>
           )}
 
-          <button type="submit" disabled={isPending} className="rounded-md bg-ink px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60">
+          <button type="submit" disabled={isPending} className="min-h-11 rounded-md bg-ink px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60">
             {isPending ? "확인 중" : "로그인"}
           </button>
         </>
       )}
 
       <details open={setupRequired ? true : undefined} className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-        <summary className="cursor-pointer font-semibold text-ink">최초 보호자 계정 준비 방법</summary>
+        <summary className="flex min-h-11 cursor-pointer items-center font-semibold text-ink">최초 보호자 계정 준비 방법</summary>
         <div className="mt-3 grid gap-3 leading-6">
           <p>시작 위치: <code>C:\codex\app\sontube</code>의 PowerShell.</p>
-          <p><code>SESSION_SECRET</code>, <code>ADMIN_PASSWORD_HASH</code>, <code>PARENT_BOOTSTRAP_EMAIL</code>을 <code>.env</code>에 설정합니다.</p>
-          <code className="overflow-x-auto rounded-md bg-slate-900 px-3 py-2 text-xs text-white">npm run auth:hash -- &lt;새비밀번호&gt; &lt;SESSION_SECRET&gt;</code>
-          <code className="overflow-x-auto rounded-md bg-slate-900 px-3 py-2 text-xs text-white">npm run db:seed</code>
+          <p><code>SESSION_SECRET</code>, <code>ADMIN_ALLOWED_EMAILS</code>, <code>ADMIN_PASSWORD_HASH</code>, <code>PARENT_BOOTSTRAP_EMAIL</code>을 <code>.env</code>에 설정합니다.</p>
+          <code
+            tabIndex={0}
+            className="block max-w-full overflow-x-auto whitespace-nowrap rounded-md bg-slate-900 px-3 py-2 text-xs text-white"
+          >
+            npm run auth:hash -- &lt;새비밀번호&gt; &lt;SESSION_SECRET&gt;
+          </code>
+          <code
+            tabIndex={0}
+            className="block max-w-full overflow-x-auto whitespace-nowrap rounded-md bg-slate-900 px-3 py-2 text-xs text-white"
+          >
+            npm run db:seed
+          </code>
         </div>
       </details>
     </form>

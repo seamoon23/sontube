@@ -21,7 +21,8 @@ export function SuperAdminNav() {
         <div className="overflow-x-auto">
           <div className="flex min-w-max gap-1">
             {navItems.map((item) => {
-              const active = item.href === "/superadmin"
+              const isExact = pathname === item.href;
+              const isActive = item.href === "/superadmin"
                 ? pathname === item.href
                 : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
@@ -29,9 +30,9 @@ export function SuperAdminNav() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  aria-current={active ? "page" : undefined}
-                  className={`min-h-11 rounded-lg px-3 py-3 text-sm font-bold transition active:translate-y-px ${
-                    active
+                  aria-current={isExact ? "page" : isActive ? "location" : undefined}
+                  className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 py-3 text-sm font-bold transition active:translate-y-px ${
+                    isActive
                       ? "bg-teal-50 text-teal-800"
                       : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
                   }`}

@@ -103,6 +103,7 @@ model ParentUser {
   email            String          @unique
   displayName      String
   passwordHash     String
+  sessionVersion   Int             @default(1)
   isActive         Boolean         @default(true)
   lastLoginAt      DateTime?
   createdAt        DateTime        @default(now())
@@ -129,6 +130,8 @@ model Video {
   customThumbnailPath String?
   safetyStatus        SafetyStatus  @default(NEEDS_REVIEW)
   isPublished         Boolean       @default(false)
+  isLitePublished     Boolean       @default(false)
+  liteSortOrder       Int           @default(0)
   isParentRecommended Boolean       @default(false)
   parentRecommendedAt DateTime?
   playMode            PlayMode      @default(SINGLE_THEN_CLOSE)
@@ -142,6 +145,7 @@ model Video {
   @@unique([familyId, youtubeVideoId])
   @@index([familyId])
   @@index([channelId])
+  @@index([isLitePublished, isPublished, safetyStatus, liteSortOrder])
 }
 
 model Channel {

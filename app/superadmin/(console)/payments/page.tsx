@@ -77,7 +77,7 @@ export default async function SuperAdminPaymentsPage({ searchParams }: PaymentsP
                 key={option.value || "all"}
                 href={`/superadmin/payments${query.size ? `?${query.toString()}` : ""}`}
                 aria-current={active ? "page" : undefined}
-                className={`rounded-lg px-3 py-2 text-sm font-bold transition ${active ? "bg-teal-50 text-teal-900" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"}`}
+                className={`inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-bold transition ${active ? "bg-teal-50 text-teal-900" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"}`}
               >
                 {option.label} <span className="font-mono">{count}</span>
               </Link>
@@ -97,23 +97,29 @@ export default async function SuperAdminPaymentsPage({ searchParams }: PaymentsP
 
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-5 py-4">
-          <h3 className="text-lg font-black text-slate-950">신청 목록</h3>
+          <h3 id="payment-results-title" className="text-lg font-black text-slate-950">신청 목록</h3>
           <p className="text-sm font-bold text-slate-500">검색 결과 {payments.length}건</p>
         </div>
         {payments.length === 0 ? (
           <div className="px-5 py-12 text-center text-sm text-slate-500">조건에 맞는 입금 신청이 없습니다.</div>
         ) : (
-          <div className="overflow-x-auto">
+          <div
+            role="region"
+            aria-labelledby="payment-results-title"
+            tabIndex={0}
+            className="overflow-x-auto focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-600"
+          >
             <table className="w-full min-w-[920px] text-left text-sm">
+              <caption className="sr-only">검색 조건에 맞는 입금 신청 목록</caption>
               <thead className="bg-slate-50 text-xs font-bold text-slate-500">
                 <tr>
-                  <th className="px-5 py-3">신청번호</th>
-                  <th className="px-4 py-3">가족 / 신청자</th>
-                  <th className="px-4 py-3">입금자 / 예정일</th>
-                  <th className="px-4 py-3">상품</th>
-                  <th className="px-4 py-3 text-right">금액</th>
-                  <th className="px-4 py-3">상태</th>
-                  <th className="px-5 py-3 text-right">신청 시각</th>
+                  <th scope="col" className="px-5 py-3">신청번호</th>
+                  <th scope="col" className="px-4 py-3">가족 / 신청자</th>
+                  <th scope="col" className="px-4 py-3">입금자 / 예정일</th>
+                  <th scope="col" className="px-4 py-3">상품</th>
+                  <th scope="col" className="px-4 py-3 text-right">금액</th>
+                  <th scope="col" className="px-4 py-3">상태</th>
+                  <th scope="col" className="px-5 py-3 text-right">신청 시각</th>
                 </tr>
               </thead>
               <tbody>
@@ -123,16 +129,16 @@ export default async function SuperAdminPaymentsPage({ searchParams }: PaymentsP
                       <Link href={`/superadmin/payments/${payment.id}`} className="font-mono text-xs font-bold text-teal-800 hover:underline">{payment.requestNo}</Link>
                     </td>
                     <td className="px-4 py-4">
-                      <p className="font-bold text-slate-900">{payment.family.name}</p>
-                      <p className="mt-1 text-xs text-slate-500">{payment.requestedBy.displayName}</p>
+                      <p className="break-words font-bold text-slate-900">{payment.family.name}</p>
+                      <p className="mt-1 break-words text-xs text-slate-500">{payment.requestedBy.displayName}</p>
                       <p className="mt-1 max-w-56 break-all text-xs text-slate-500">{payment.requestedBy.email}</p>
                     </td>
                     <td className="px-4 py-4">
-                      <p className="font-bold text-slate-800">{payment.depositorName}</p>
+                      <p className="break-words font-bold text-slate-800">{payment.depositorName}</p>
                       <p className="mt-1 text-xs text-slate-500">{payment.expectedDepositDate || "미입력"}</p>
                     </td>
                     <td className="px-4 py-4">
-                      <p className="font-bold text-slate-800">{payment.planNameSnapshot}</p>
+                      <p className="break-words font-bold text-slate-800">{payment.planNameSnapshot}</p>
                       <p className="mt-1 text-xs text-slate-500">{payment.durationDaysSnapshot}일</p>
                     </td>
                     <td className="px-4 py-4 text-right font-mono font-black text-slate-900">{formatKrw(payment.amountKrw)}</td>

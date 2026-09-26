@@ -4,5 +4,6 @@
     <color name="ocean">#0369A1</color>
     <color name="surface">#F8FAFC</color>
     <color name="muted">#475569</color>
+    <color name="outline">#CBD5E1</color>
     <color name="white">#FFFFFF</color>
 </resources>

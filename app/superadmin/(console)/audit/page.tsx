@@ -97,22 +97,28 @@ export default async function SuperAdminAuditPage({ searchParams }: AuditPagePro
 
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-5 py-4">
-          <h3 className="text-lg font-black text-slate-950">기록 목록</h3>
+          <h3 id="audit-results-title" className="text-lg font-black text-slate-950">기록 목록</h3>
           <p className="text-sm font-bold text-slate-500">최근 {rows.length}건</p>
         </div>
         {rows.length === 0 ? (
           <div className="px-5 py-12 text-center text-sm text-slate-500">조건에 맞는 감사 기록이 없습니다.</div>
         ) : (
-          <div className="overflow-x-auto">
+          <div
+            role="region"
+            aria-labelledby="audit-results-title"
+            tabIndex={0}
+            className="overflow-x-auto focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-600"
+          >
             <table className="w-full min-w-[900px] text-left text-sm">
+              <caption className="sr-only">최종관리자 및 결제 감사 기록</caption>
               <thead className="bg-slate-50 text-xs font-bold text-slate-500">
                 <tr>
-                  <th className="px-5 py-3">시각</th>
-                  <th className="px-4 py-3">구분</th>
-                  <th className="px-4 py-3">작업</th>
-                  <th className="px-4 py-3">담당자</th>
-                  <th className="px-4 py-3">대상</th>
-                  <th className="px-5 py-3">세부 내용</th>
+                  <th scope="col" className="px-5 py-3">시각</th>
+                  <th scope="col" className="px-4 py-3">구분</th>
+                  <th scope="col" className="px-4 py-3">작업</th>
+                  <th scope="col" className="px-4 py-3">담당자</th>
+                  <th scope="col" className="px-4 py-3">대상</th>
+                  <th scope="col" className="px-5 py-3">세부 내용</th>
                 </tr>
               </thead>
               <tbody>
@@ -121,9 +127,9 @@ export default async function SuperAdminAuditPage({ searchParams }: AuditPagePro
                     <td className="whitespace-nowrap px-5 py-4 text-xs text-slate-500">{formatDateTime(row.createdAt)}</td>
                     <td className="px-4 py-4"><span className={`rounded-md border px-2 py-1 text-xs font-bold ${row.kind === "ADMIN" ? "border-teal-200 bg-teal-50 text-teal-900" : "border-sky-200 bg-sky-50 text-sky-900"}`}>{row.kind === "ADMIN" ? "계정·설정" : "결제·이용권"}</span></td>
                     <td className="px-4 py-4 font-bold text-slate-900">{row.action}</td>
-                    <td className="px-4 py-4 font-mono text-xs text-slate-600">{row.actor}</td>
-                    <td className="px-4 py-4 text-slate-700">{row.paymentId ? <Link href={`/superadmin/payments/${row.paymentId}`} className="font-bold text-teal-800 hover:underline">{row.target}</Link> : row.target}</td>
-                    <td className="max-w-md whitespace-pre-wrap px-5 py-4 text-xs leading-5 text-slate-600">{row.detail || "없음"}</td>
+                    <td className="max-w-48 break-all px-4 py-4 font-mono text-xs text-slate-600">{row.actor}</td>
+                    <td className="max-w-xs break-words px-4 py-4 text-slate-700">{row.paymentId ? <Link href={`/superadmin/payments/${row.paymentId}`} className="font-bold text-teal-800 hover:underline">{row.target}</Link> : row.target}</td>
+                    <td className="max-w-md whitespace-pre-wrap break-words px-5 py-4 text-xs leading-5 text-slate-600">{row.detail || "없음"}</td>
                   </tr>
                 ))}
               </tbody>

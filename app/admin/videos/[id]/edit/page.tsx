@@ -47,6 +47,8 @@ export default async function EditVideoPage({ params }: EditVideoPageProps) {
     channelId: video.channelId,
     safetyStatus: video.safetyStatus,
     isPublished: video.isPublished,
+    isLitePublished: video.isLitePublished,
+    liteSortOrder: video.liteSortOrder,
     isParentRecommended: video.isParentRecommended,
     playMode: video.playMode,
     thumbnailType: video.thumbnailType,

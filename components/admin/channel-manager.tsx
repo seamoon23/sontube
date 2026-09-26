@@ -19,40 +19,67 @@ export type ChannelManagerItem = {
   approvedVideoCount: number;
 };
 
+type PendingChannelAction = {
+  kind: "rename" | "toggle" | "merge";
+  id: string;
+} | null;
+
 export function ChannelManager({ channels }: { channels: ChannelManagerItem[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [pendingAction, setPendingAction] = useState<PendingChannelAction>(null);
   const [results, setResults] = useState<Record<string, ChannelActionResult>>({});
   const [globalResult, setGlobalResult] = useState<ChannelActionResult | null>(null);
 
-  function run(channelId: string, operation: () => Promise<ChannelActionResult>) {
+  function run(
+    channelId: string,
+    kind: Exclude<PendingChannelAction, null>["kind"],
+    operation: () => Promise<ChannelActionResult>,
+  ) {
     setGlobalResult(null);
+    setPendingAction({ kind, id: channelId });
     setResults((current) => {
       const next = { ...current };
       delete next[channelId];
       return next;
     });
     startTransition(async () => {
-      const result = await operation();
-      setResults((current) => ({ ...current, [channelId]: result }));
-      if (result.ok) router.refresh();
+      try {
+        const result = await operation();
+        setResults((current) => ({ ...current, [channelId]: result }));
+        if (result.ok) router.refresh();
+      } finally {
+        setPendingAction(null);
+      }
     });
   }
 
   function runMerge(sourceChannelId: string, formData: FormData) {
     setGlobalResult(null);
+    setPendingAction({ kind: "merge", id: sourceChannelId });
     startTransition(async () => {
-      const result = await mergeChannelAction(sourceChannelId, formData);
-      setGlobalResult(result);
-      if (result.ok) router.refresh();
+      try {
+        const result = await mergeChannelAction(sourceChannelId, formData);
+        setGlobalResult(result);
+        if (result.ok) router.refresh();
+      } finally {
+        setPendingAction(null);
+      }
     });
   }
 
   return (
-    <section className="grid gap-4">
+    <section className="grid gap-4" aria-busy={isPending}>
+      {isPending && (
+        <p className="sr-only" role="status" aria-live="polite">
+          채널 변경을 처리하고 있습니다.
+        </p>
+      )}
       {globalResult && (
         <p
-          role="status"
+          role={globalResult.ok ? "status" : "alert"}
+          aria-live={globalResult.ok ? "polite" : "assertive"}
+          aria-atomic="true"
           className={`rounded-md px-3 py-2 text-sm font-semibold ${
             globalResult.ok ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"
           }`}
@@ -72,7 +99,7 @@ export function ChannelManager({ channels }: { channels: ChannelManagerItem[] })
             className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="break-words text-lg font-bold text-ink">{channel.displayName}</h3>
                   <span
@@ -89,7 +116,7 @@ export function ChannelManager({ channels }: { channels: ChannelManagerItem[] })
               </div>
               <Link
                 href={`/admin/videos?channel=${encodeURIComponent(channel.id)}`}
-                className="inline-flex min-h-10 items-center rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-ocean hover:text-ocean"
+                className="inline-flex min-h-11 items-center rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-ocean hover:text-ocean"
               >
                 이 채널 영상 보기
               </Link>
@@ -100,7 +127,7 @@ export function ChannelManager({ channels }: { channels: ChannelManagerItem[] })
                 onSubmit={(event) => {
                   event.preventDefault();
                   const formData = new FormData(event.currentTarget);
-                  run(channel.id, () => renameChannelAction(channel.id, formData));
+                  run(channel.id, "rename", () => renameChannelAction(channel.id, formData));
                 }}
                 className="grid gap-2 rounded-md bg-slate-50 p-3"
               >
@@ -113,14 +140,16 @@ export function ChannelManager({ channels }: { channels: ChannelManagerItem[] })
                     name="displayName"
                     defaultValue={channel.displayName}
                     maxLength={MAX_CHANNEL_DISPLAY_NAME_LENGTH}
-                    className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="min-h-11 min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
                   />
                   <button
                     type="submit"
                     disabled={isPending}
-                    className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-ocean hover:text-ocean disabled:opacity-50"
+                    className="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-ocean hover:text-ocean disabled:opacity-50"
                   >
-                    이름 저장
+                    {pendingAction?.kind === "rename" && pendingAction.id === channel.id
+                      ? "저장 중"
+                      : "이름 저장"}
                   </button>
                 </div>
               </form>
@@ -133,10 +162,14 @@ export function ChannelManager({ channels }: { channels: ChannelManagerItem[] })
                 <button
                   type="button"
                   disabled={isPending}
-                  onClick={() => run(channel.id, () => toggleChannelActiveAction(channel.id))}
-                  className="w-fit rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-ocean hover:text-ocean disabled:opacity-50"
+                  onClick={() => run(channel.id, "toggle", () => toggleChannelActiveAction(channel.id))}
+                  className="min-h-11 w-fit rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-ocean hover:text-ocean disabled:opacity-50"
                 >
-                  {channel.isActive ? "새 영상 선택에서 숨기기" : "다시 사용하기"}
+                  {pendingAction?.kind === "toggle" && pendingAction.id === channel.id
+                    ? "변경 중"
+                    : channel.isActive
+                      ? "새 영상 선택에서 숨기기"
+                      : "다시 사용하기"}
                 </button>
               </div>
             </div>
@@ -166,7 +199,7 @@ export function ChannelManager({ channels }: { channels: ChannelManagerItem[] })
                   name="targetChannelId"
                   defaultValue=""
                   disabled={mergeTargets.length === 0 || isPending}
-                  className="rounded-md border border-amber-300 bg-white px-3 py-2 text-sm text-slate-700"
+                  className="min-h-11 min-w-0 w-full rounded-md border border-amber-300 bg-white px-3 py-2 text-sm text-slate-700"
                 >
                   <option value="">영상을 옮길 채널 선택</option>
                   {mergeTargets.map((candidate) => (
@@ -182,15 +215,19 @@ export function ChannelManager({ channels }: { channels: ChannelManagerItem[] })
               <button
                 type="submit"
                 disabled={mergeTargets.length === 0 || isPending}
-                className="rounded-md border border-amber-400 bg-white px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                className="min-h-11 rounded-md border border-amber-400 bg-white px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                선택 채널로 병합
+                {pendingAction?.kind === "merge" && pendingAction.id === channel.id
+                  ? "병합 중"
+                  : "선택 채널로 병합"}
               </button>
             </form>
 
             {result && (
               <p
-                role="status"
+                role={result.ok ? "status" : "alert"}
+                aria-live={result.ok ? "polite" : "assertive"}
+                aria-atomic="true"
                 className={`rounded-md px-3 py-2 text-sm font-semibold ${
                   result.ok ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"
                 }`}

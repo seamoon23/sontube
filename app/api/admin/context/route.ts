@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { ADMIN_SESSION_COOKIE, parseAdminSessionToken } from "@/lib/admin-auth";
+import {
+  ADMIN_SESSION_COOKIE,
+  isAdminAuthConfigured,
+  isAdminEmailAllowed,
+  parseAdminSessionToken,
+} from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  if (!isAdminAuthConfigured(process.env)) {
+    return NextResponse.json({ ok: false }, { status: 401, headers: { "cache-control": "no-store" } });
+  }
+
   const cookieStore = await cookies();
   const session = parseAdminSessionToken(
     cookieStore.get(ADMIN_SESSION_COOKIE)?.value,
@@ -20,13 +29,14 @@ export async function GET() {
     where: {
       id: session.userId,
       familyId: session.familyId,
+      sessionVersion: session.sessionVersion,
       isActive: true,
       family: { is: { isActive: true } },
     },
-    select: { displayName: true },
+    select: { displayName: true, email: true },
   });
 
-  if (!user) {
+  if (!user || (!session.impersonatedBy && !isAdminEmailAllowed(user.email, process.env))) {
     return NextResponse.json({ ok: false }, { status: 401, headers: { "cache-control": "no-store" } });
   }
 

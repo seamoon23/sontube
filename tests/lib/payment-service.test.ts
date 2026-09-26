@@ -379,6 +379,7 @@ async function createFixture(suffix: string) {
       passwordHash: "not-a-real-password-hash",
     },
   });
+  expect(parent.sessionVersion).toBe(1);
   const plan = await database.paymentPlan.create({
     data: {
       code: `PLAN-${suffix}-${family.id}`,
@@ -454,6 +455,7 @@ async function createTestSchema(client: PrismaClient): Promise<void> {
       "email" TEXT NOT NULL,
       "displayName" TEXT NOT NULL,
       "passwordHash" TEXT NOT NULL,
+      "sessionVersion" INTEGER NOT NULL DEFAULT 1,
       "isActive" BOOLEAN NOT NULL DEFAULT true,
       "lastLoginAt" DATETIME,
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

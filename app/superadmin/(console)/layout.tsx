@@ -27,9 +27,9 @@ export default async function SuperAdminConsoleLayout({
               서비스 운영 콘솔
             </h1>
           </div>
-          <div className="text-right text-xs leading-5 text-slate-500">
+          <div className="min-w-0 max-w-full text-left text-xs leading-5 text-slate-500 sm:text-right">
             <p>로그인 계정</p>
-            <p className="font-mono font-bold text-slate-800">{session.loginId}</p>
+            <p className="break-all font-mono font-bold text-slate-800">{session.loginId}</p>
           </div>
         </div>
       </header>

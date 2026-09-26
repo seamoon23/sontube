@@ -8,6 +8,8 @@ const ADMIN_SESSION_MAX_AGE_MS = ADMIN_SESSION_MAX_AGE_SECONDS * 1000;
 const ADMIN_IMPERSONATION_SESSION_MAX_AGE_MS =
   ADMIN_IMPERSONATION_SESSION_MAX_AGE_SECONDS * 1000;
 const MAX_SESSION_TOKEN_LENGTH = 4096;
+const REQUIRED_ADMIN_ALLOWED_EMAILS = 2;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 
 type AdminAuthEnv = Record<string, string | undefined>;
 
@@ -16,6 +18,7 @@ export type AdminSessionIdentity = {
   familyId: string;
   email: string;
   displayName: string;
+  sessionVersion: number;
   impersonatedBy?: string;
 };
 
@@ -24,7 +27,27 @@ export type AdminSessionPayload = AdminSessionIdentity & {
 };
 
 export function isAdminAuthConfigured(env: AdminAuthEnv): boolean {
-  return Boolean(env.SESSION_SECRET?.trim());
+  return Boolean(env.SESSION_SECRET?.trim()) && getAdminAllowedEmails(env).length > 0;
+}
+
+export function getAdminAllowedEmails(env: AdminAuthEnv): string[] {
+  const raw = env.ADMIN_ALLOWED_EMAILS?.trim();
+  if (!raw) {
+    return [];
+  }
+
+  const entries = raw.split(",").map(normalizeAdminEmail);
+  if (entries.some((email) => !email || email.length > 320 || !EMAIL_PATTERN.test(email))) {
+    return [];
+  }
+
+  const uniqueEntries = [...new Set(entries)];
+  return uniqueEntries.length === REQUIRED_ADMIN_ALLOWED_EMAILS ? uniqueEntries : [];
+}
+
+export function isAdminEmailAllowed(email: string, env: AdminAuthEnv): boolean {
+  const normalizedEmail = normalizeAdminEmail(email);
+  return Boolean(normalizedEmail) && getAdminAllowedEmails(env).includes(normalizedEmail);
 }
 
 export function hashAdminPassword(password: string, secret: string): string {
@@ -50,6 +73,7 @@ export function createAdminSessionToken(
     familyId: identity.familyId,
     email: identity.email,
     displayName: identity.displayName,
+    sessionVersion: identity.sessionVersion,
     ...(identity.impersonatedBy ? { impersonatedBy: identity.impersonatedBy } : {}),
     issuedAt: issuedAt.getTime(),
   };
@@ -133,6 +157,9 @@ function isAdminSessionPayload(value: unknown): value is AdminSessionPayload {
     isBoundedText(value.familyId, 1, 191) &&
     isBoundedText(value.email, 3, 320) &&
     isBoundedText(value.displayName, 1, 120) &&
+    typeof value.sessionVersion === "number" &&
+    Number.isSafeInteger(value.sessionVersion) &&
+    value.sessionVersion >= 1 &&
     (value.impersonatedBy === undefined ||
       isBoundedText(value.impersonatedBy, 1, 191)) &&
     typeof value.issuedAt === "number" &&
@@ -152,6 +179,10 @@ function isBoundedText(value: unknown, min: number, max: number): value is strin
     value.length <= max &&
     value.trim() === value
   );
+}
+
+function normalizeAdminEmail(value: string): string {
+  return value.normalize("NFKC").trim().toLowerCase();
 }
 
 function sign(payload: string, secret: string): string {

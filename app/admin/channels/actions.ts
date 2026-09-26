@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { requireAdminSession } from "@/lib/admin-session";
 import {
+  IMPERSONATION_READ_ONLY_MESSAGE,
+  isAdminMutationBlocked,
+} from "@/lib/admin-mutation-guard";
+import {
   cleanChannelDisplayName,
   MAX_CHANNEL_DISPLAY_NAME_LENGTH,
   normalizeChannelName,
@@ -19,6 +23,9 @@ export async function renameChannelAction(
   formData: FormData,
 ): Promise<ChannelActionResult> {
   const session = await requireAdminSession();
+  if (isAdminMutationBlocked(session)) {
+    return { ok: false, message: IMPERSONATION_READ_ONLY_MESSAGE };
+  }
   const channel = await prisma.channel.findFirst({
     where: { id: channelId, familyId: session.familyId },
     select: { id: true },
@@ -66,6 +73,9 @@ export async function toggleChannelActiveAction(
   channelId: string,
 ): Promise<ChannelActionResult> {
   const session = await requireAdminSession();
+  if (isAdminMutationBlocked(session)) {
+    return { ok: false, message: IMPERSONATION_READ_ONLY_MESSAGE };
+  }
   const channel = await prisma.channel.findFirst({
     where: { id: channelId, familyId: session.familyId },
     select: { id: true, isActive: true },
@@ -93,6 +103,9 @@ export async function mergeChannelAction(
   formData: FormData,
 ): Promise<ChannelActionResult> {
   const session = await requireAdminSession();
+  if (isAdminMutationBlocked(session)) {
+    return { ok: false, message: IMPERSONATION_READ_ONLY_MESSAGE };
+  }
   const targetChannelId = String(formData.get("targetChannelId") ?? "").trim();
   if (!targetChannelId) {
     return { ok: false, message: "합칠 대상 채널을 선택해 주세요." };

@@ -301,7 +301,7 @@ export function AdminGuideButton() {
           setSlideIndex(0);
           setIsOpen(true);
         }}
-        className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-ocean transition hover:border-ocean hover:bg-sky-100"
+        className="min-h-11 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-ocean transition hover:border-ocean hover:bg-sky-100"
       >
         사용 안내
       </button>
@@ -334,7 +334,7 @@ export function AdminGuideButton() {
               ref={closeButtonRef}
               type="button"
               onClick={closeGuide}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-ocean hover:text-ocean"
+              className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-ocean hover:text-ocean"
             >
               닫기
             </button>
@@ -359,14 +359,14 @@ export function AdminGuideButton() {
               type="button"
               onClick={() => setSlideIndex((current) => Math.max(0, current - 1))}
               disabled={slideIndex === 0}
-              className="rounded-md border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:border-ocean hover:text-ocean disabled:cursor-not-allowed disabled:opacity-40"
+              className="min-h-11 rounded-md border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:border-ocean hover:text-ocean disabled:cursor-not-allowed disabled:opacity-40"
             >
               이전
             </button>
             <button
               type="button"
               onClick={() => isLastSlide ? completeGuide() : setSlideIndex((current) => current + 1)}
-              className="rounded-md bg-ink px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700"
+              className="min-h-11 rounded-md bg-ink px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700"
             >
               {isLastSlide ? "안내 완료" : "다음"}
             </button>

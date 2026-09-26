@@ -141,3 +141,43 @@ Android 앱이 화면에 보이는 동안 기본 네트워크의 연결·전송 
 ## D033. Android 설정 보호는 기기 자격 증명을 우선 사용
 
 앱 키가 등록된 Android 앱에서 설정 열기와 키 교체는 운영체제의 PIN·패턴·비밀번호 확인을 우선 사용한다. 현재 산수 문제는 일반 브라우저 QA용 보조 장치일 뿐 보안 인증으로 간주하지 않는다. 인증 성공은 설정 진입 한 번에만 사용하고 background 이동 시 폐기한다. 1차 구현에서 별도 SonTube PIN을 만들지 않으며, 자세한 위협 범위와 복구·QA 기준은 `docs/ANDROID_PARENT_AUTH_DESIGN.md`를 따른다.
+
+## D034. 웹과 Android는 하나의 저장소에서 관리하고 전달 파이프라인은 분리
+
+웹과 `android-client/`는 당분간 SonTube 저장소 하나에서 함께 관리한다. 앱 카탈로그 계약과 Android 네트워크·탐색 정책이 웹 API와 함께 바뀌기 때문에 저장소를 미리 나누지 않는다. 대신 웹 검증·배포와 Android 로직 검증·APK/AAB 산출물은 서로 독립된 CI 작업과 승인 절차를 사용한다. 웹만 바뀐 커밋이 Android 배포를 만들거나, Android 산출물 작업이 웹 운영 배포를 자동으로 바꾸지 않게 한다.
+
+## D035. 공개 웹은 부모용 소개와 명시 공개된 Lite 카탈로그로 제한
+
+공개 `/`는 부모를 위한 제품 소개와 사용 흐름 안내다. 공개 `/lite`는 운영자가 별도로 `Lite 공개`한 영상 중 `보호자 확인 완료`, `아이 화면 공개`, 활성 가족 조건까지 모두 만족한 영상만 모은 읽기 전용 공용 체험이다. 초기 Lite는 검색 노출 목적이 아니므로 `noindex`로 운영한다. 검색봇이 `noindex`를 읽을 수 있도록 Lite page/API crawl은 허용한다. 가족별 관리자 카탈로그 전체를 공개하거나, 가족 ID·원본 URL·앱 키·결제·이용권 데이터를 Lite 응답에 포함하지 않는다. 공개 대상이 0개이면 빈 상태를 보여주며 샘플이나 Android의 비공개 캐시로 대체하지 않는다.
+
+Lite는 공개 목록 안의 제목·보호자 키워드 검색, 태그·채널 필터, 같은 채널의 공개 영상 보기, YouTube iframe 재생·전체 화면과 브라우저 `localStorage` 내 목록만 제공한다. 앱 키 등록, 가족별 승인 목록, 서버 피드백, 관심 통계, 결제, Android 기기 잠금과 Wi-Fi 강제는 제공하지 않는다. 제한형 시청과 가족별 정책이 필요하면 Android `/app`을 사용한다.
+
+공개 카탈로그 성공 응답은 요청별 `generatedAt` 차이를 허용하는 weak ETag와 `Cache-Control: public, max-age=0, s-maxage=60, must-revalidate`를 사용한다. 브라우저는 매번 재검증하고 공유 CDN은 최대 60초까지만 재사용해 공개 차단이 오래 지연되지 않게 한다. 오류 응답은 `private, no-store`로 캐시하지 않는다. 체크인된 JSON Schema를 실제 route의 200 응답에 적용하고 304·503 경계를 CI에서 검증한다.
+
+## D036. 관리자 접근은 애플리케이션 인증과 Cloudflare Access를 함께 사용
+
+`/admin`은 `ADMIN_ALLOWED_EMAILS`에 명시한 운영 보호자 두 계정만 허용하고, 활성 `ParentUser` 확인과 기존 세션 검증을 계속 적용한다. `/superadmin`은 별도 `SUPERADMIN_*` 자격 증명을 가진 소유자 한 명만 사용한다. Cloudflare Access는 이 인증을 대체하지 않고 배포 도메인 앞의 추가 경계로 둔다. 관리자용 Access 정책에는 같은 두 이메일을, 최종관리자 정책에는 소유자 이메일 하나만 등록한다.
+
+Access는 관리자 경로에만 적용한다. 공개 `/`, `/lite`, `/api/lite/*`와 Android에 필요한 `/app`, `/api/app/*`에는 Access 로그인이나 광범위한 호스트 정책을 씌우지 않는다. `/api/app/*`는 자체 앱 키·설치 ID 검증을 유지한다. Access 경로의 `*`는 부모 경로 자체를 포함하지 않으므로 `/admin`과 `/admin/*`, `/superadmin`과 `/superadmin/*`를 각각 함께 설정한다.
+
+## D037. 현재 운영 배포와 Cloudflare Pages·Supabase 전환을 분리
+
+현재 웹은 동적 Next.js 서버, Prisma/SQLite 쓰기와 `public/uploads/thumbnails/` 로컬 파일 쓰기에 의존한다. 따라서 현 상태를 Cloudflare Pages의 정적 출력으로 바로 배포하지 않는다. 1차 운영은 영구 디스크가 있는 단일 Node 서버에 웹·SQLite·업로드를 함께 두고 Cloudflare DNS·TLS·Access를 앞단에 배치한다. DB와 업로드는 같은 시점으로 백업·복구한다.
+
+후속 단계에서는 SonTube 전용 Supabase 프로젝트로 PostgreSQL·Auth·RLS·Storage·권한 Edge Function을 이관하고, 웹을 정적 SPA/PWA로 재구성한 뒤 SonTube 전용 Cloudflare Pages 프로젝트에 배포한다. `jjunybox.com` DNS 존과 Cloudflare 계정만 공유하며 Museum·Arcade 또는 다른 서비스의 Supabase 프로젝트, 데이터, service role과 배포 설정은 공유하지 않는다.
+
+## D038. 보호자 세션은 버전으로 폐기하고 대체 로그인은 읽기 전용으로 제한
+
+보호자 세션에는 `ParentUser.sessionVersion`을 서명하고 매 요청마다 현재 DB 값과 비교한다. 비밀번호 재설정, 보호자 활성 상태 변경, 가족 활성 상태 변경 시 관련 버전을 증가시켜 기존 7일 세션과 30분 대체 로그인 세션을 즉시 무효화한다. `ADMIN_ALLOWED_EMAILS`는 정규화한 서로 다른 이메일 정확히 두 개일 때만 유효하다.
+
+최종관리자의 대체 로그인은 버그 재현과 화면 확인만 위한 읽기 전용 세션이다. 영상과 Lite 공개, 태그, 채널, 앱 키, Wi-Fi 정책, 아이 반응, 결제 등 보호자 화면의 모든 변경을 서버 액션에서 차단한다. 종료와 로그아웃은 감사 저장소 장애가 있어도 인증 쿠키를 먼저 폐기한다.
+
+현재 Lite 공개 권한은 이 두 운영 보호자 계정에 한정한다. 향후 일반 보호자 관리 계정을 개방하기 전에는 Lite 공개 전용 운영자 역할과 변경 감사 로그를 별도로 추가하며, 단순 `ParentUser` 로그인만으로 전역 공개 권한을 주지 않는다.
+
+## D039. 1차 SQLite 운영은 사전점검·쓰기 중지 백업·복구 훈련을 전제로 함
+
+운영 `DATABASE_URL`은 영구 볼륨의 절대 SQLite `file:` 경로만 사용하고, 세션 비밀키·두 보호자 allowlist·최종관리자와 수동 결제 필수 설정은 실제 값을 출력하지 않는 사전점검을 통과해야 한다. `/api/health`는 DB 읽기 성공 여부만 200/503과 no-store로 반환하고 경로·버전·오류 원문을 노출하지 않는다.
+
+SQLite 스냅샷은 `VACUUM INTO`, 커스텀 썸네일은 SHA-256 manifest로 백업·검증한다. DB와 파일 업로드를 하나의 트랜잭션으로 묶을 수 없으므로 백업과 복구 중에는 애플리케이션 쓰기를 멈춘다. 복구는 기본적으로 기존 대상을 덮어쓰지 않고 dry-run과 manifest 검증을 먼저 요구하며, `--force` 교체는 별도 사본을 확보한 운영자만 수행한다. archive 성공 검증만으로 완료로 보지 않고 정기적인 staging 복구 훈련을 운영 조건으로 둔다.
+
+Android debug APK CI artifact는 개발·QA 편의를 위한 기본 debug signing 산출물이며 릴리스 서명이나 스토어 배포 승인을 대신하지 않는다.

@@ -65,22 +65,22 @@ export default async function SuperAdminPlansPage({ searchParams }: PlansPagePro
           plans.map((plan) => (
             <article key={plan.id} className="rounded-xl border border-slate-200 bg-white p-5">
               <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
+                <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h4 className="text-xl font-black text-slate-950">{plan.name}</h4>
+                    <h4 className="min-w-0 break-words text-xl font-black text-slate-950">{plan.name}</h4>
                     <ActiveStatusBadge active={plan.isActive} />
                   </div>
-                  <p className="mt-1 font-mono text-xs font-bold text-slate-500">{plan.code}</p>
-                  <p className="mt-3 text-sm leading-6 text-slate-600">{plan.description || "설명 없음"}</p>
+                  <p className="mt-1 break-all font-mono text-xs font-bold text-slate-500">{plan.code}</p>
+                  <p className="mt-3 break-words text-sm leading-6 text-slate-600">{plan.description || "설명 없음"}</p>
                 </div>
-                <div className="text-right">
+                <div className="shrink-0 text-right">
                   <p className="font-mono text-2xl font-black text-slate-950">{formatKrw(plan.priceKrw)}</p>
                   <p className="mt-1 text-sm font-bold text-slate-500">{plan.durationDays}일 / 신청 {plan._count.requests}건</p>
                 </div>
               </div>
 
               <details className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <summary className="cursor-pointer text-sm font-bold text-teal-800">요금제 수정과 활성 상태</summary>
+                <summary className="flex min-h-11 cursor-pointer items-center text-sm font-bold text-teal-800">요금제 수정과 활성 상태</summary>
                 <form action={updatePaymentPlanAction} className="mt-4 grid gap-4 border-t border-slate-200 pt-4 md:grid-cols-2 xl:grid-cols-6">
                   <input type="hidden" name="planId" value={plan.id} />
                   <input type="hidden" name="returnTo" value="/superadmin/plans" />

@@ -39,7 +39,7 @@ export function KidsPlaylistButton({ item }: { item: KidsPlaylistItem }) {
       onClick={toggle}
       aria-pressed={isSaved}
       aria-label={`${item.title} ${isSaved ? "내 목록에서 빼기" : "내 목록에 담기"}`}
-      className={`rounded-md px-3 py-2 text-sm font-bold transition ${
+      className={`min-h-11 rounded-md px-3 py-2 text-sm font-bold transition active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ocean focus-visible:ring-offset-2 motion-reduce:transform-none motion-reduce:transition-none ${
         isSaved ? "bg-coral text-white" : "border border-slate-300 bg-white text-slate-700 hover:border-coral"
       }`}
     >
@@ -65,25 +65,26 @@ export function KidsPlaylistPanel() {
   if (items.length === 0) return null;
 
   return (
-    <section className="mx-auto grid max-w-6xl gap-3 px-4 pt-5 md:px-8">
+    <section className="mx-auto grid max-w-6xl gap-3 px-4 pt-5 md:px-8" aria-labelledby="kids-playlist-title">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-black text-ink">내 목록</h2>
+        <h2 id="kids-playlist-title" className="text-lg font-black text-ink">내 목록</h2>
         <span className="text-xs font-semibold text-slate-500">{items.length}개</span>
       </div>
-      <div className="flex gap-3 overflow-x-auto pb-2">
+      <ul className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2">
         {items.map((item) => (
-          <a
-            key={item.id}
-            href={`/kids/watch/${item.id}`}
-            aria-label={`${item.title} 보기`}
-            className="grid w-44 shrink-0 gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={item.thumbnailUrl} alt="" className="aspect-video w-full rounded-md object-cover" />
-            <span className="line-clamp-2 break-words text-sm font-bold text-ink">{item.title}</span>
-          </a>
+          <li key={item.id} className="w-44 shrink-0 snap-start">
+            <a
+              href={`/kids/watch/${item.id}`}
+              aria-label={`${item.title} 보기`}
+              className="grid h-full gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ocean focus-visible:ring-offset-2 motion-reduce:transition-none"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={item.thumbnailUrl} alt="" loading="lazy" decoding="async" className="aspect-video w-full rounded-md bg-slate-100 object-cover" />
+              <span className="line-clamp-2 break-words text-sm font-bold text-ink">{item.title}</span>
+            </a>
+          </li>
         ))}
-      </div>
+      </ul>
     </section>
   );
 }

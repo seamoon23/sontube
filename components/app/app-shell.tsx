@@ -87,6 +87,7 @@ export function AppShell() {
   const [feedbackByVideoId, setFeedbackByVideoId] = useState<Record<string, KidsFeedbackSignalType>>({});
   const [isSyncing, setIsSyncing] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"info" | "error">("info");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [parentGateOpen, setParentGateOpen] = useState(false);
   const [parentChallenge, setParentChallenge] = useState<ParentChallenge>(() => createParentChallenge());
@@ -94,6 +95,9 @@ export function AppShell() {
   const [parentGateError, setParentGateError] = useState("");
   const [showConnectionSamples, setShowConnectionSamples] = useState(false);
   const syncInFlightRef = useRef<Promise<boolean> | null>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const parentAnswerRef = useRef<HTMLInputElement>(null);
+  const appKeyInputRef = useRef<HTMLInputElement>(null);
 
   const syncWithKey = useCallback(
     async (
@@ -107,17 +111,20 @@ export function AppShell() {
         const currentInstallationId = getOrCreateInstallationId();
 
         if (!trimmedKey) {
+          setMessageTone("error");
           setMessage("관리자 화면에서 만든 앱 키를 먼저 등록해 주세요.");
           return false;
         }
 
         setIsSyncing(true);
+        setMessageTone("info");
         setMessage("");
 
         try {
           const policy = await fetchAppPolicy(currentInstallationId);
           if (policy.wifiRequired && !isRequiredNetworkAvailable()) {
             setShowConnectionSamples(true);
+            setMessageTone("error");
             setMessage("Wi-Fi 연결을 확인할 수 없어 샘플 목록만 보여줍니다.");
             return false;
           }
@@ -136,6 +143,7 @@ export function AppShell() {
 
           if (!response.ok || !data.ok) {
             if (response.status >= 500) setShowConnectionSamples(true);
+            setMessageTone("error");
             setMessage(data.message || "동기화에 실패했습니다.");
             return false;
           }
@@ -144,6 +152,7 @@ export function AppShell() {
           const nextCatalog = data.catalog ?? previousCatalog;
           if (!nextCatalog) {
             setShowConnectionSamples(true);
+            setMessageTone("error");
             setMessage("저장된 목록이 없어 샘플 목록만 보여줍니다.");
             return false;
           }
@@ -167,14 +176,16 @@ export function AppShell() {
             current && nextCatalog.videos.some((video) => video.channel?.id === current) ? current : null,
           );
           setActiveVideoId((current) => current ?? nextCatalog.videos[0]?.id ?? null);
+          setMessageTone("info");
           setMessage(data.message);
           return true;
         } catch (error) {
           setShowConnectionSamples(true);
           const detail =
-            error instanceof Error && error.name !== "AbortError"
-              ? error.message
-              : "연결 확인 시간이 초과되었습니다.";
+            error instanceof Error && error.name === "AbortError"
+              ? "연결 확인 시간이 초과되었습니다."
+              : "서버에 연결하지 못했습니다.";
+          setMessageTone("error");
           setMessage(`${detail} 샘플 목록만 보여줍니다.`);
           return false;
         } finally {
@@ -231,6 +242,14 @@ export function AppShell() {
     };
   }, [isReady, savedKey, syncWithKey]);
 
+  useEffect(() => {
+    if (parentGateOpen) parentAnswerRef.current?.focus({ preventScroll: true });
+  }, [parentGateOpen, parentChallenge]);
+
+  useEffect(() => {
+    if (settingsOpen && savedKey) appKeyInputRef.current?.focus({ preventScroll: true });
+  }, [savedKey, settingsOpen]);
+
   const cachedAccess = syncState?.access ?? null;
   const access = useMemo(() => (cachedAccess ? evaluateLocalAccess(cachedAccess) : null), [cachedAccess]);
   const videos = useMemo(() => (access?.canSync ? syncState?.catalog.videos ?? EMPTY_APP_VIDEOS : EMPTY_APP_VIDEOS), [access, syncState]);
@@ -277,8 +296,13 @@ export function AppShell() {
   }
 
   function requestSettings() {
-    if (isInitialSetup || settingsOpen) {
-      setSettingsOpen((current) => !current);
+    if (isInitialSetup) {
+      appKeyInputRef.current?.focus({ preventScroll: true });
+      return;
+    }
+
+    if (settingsOpen) {
+      setSettingsOpen(false);
       return;
     }
 
@@ -286,6 +310,16 @@ export function AppShell() {
     setParentAnswer("");
     setParentGateError("");
     setParentGateOpen(true);
+  }
+
+  function closeParentGate() {
+    setParentGateOpen(false);
+    window.requestAnimationFrame(() => settingsButtonRef.current?.focus({ preventScroll: true }));
+  }
+
+  function closeSettings() {
+    setSettingsOpen(false);
+    window.requestAnimationFrame(() => settingsButtonRef.current?.focus({ preventScroll: true }));
   }
 
   function submitParentGate(event: React.FormEvent<HTMLFormElement>) {
@@ -340,11 +374,25 @@ export function AppShell() {
   }
 
   if (!isReady) {
-    return <main className="grid min-h-screen place-items-center bg-slate-50 text-sm font-semibold text-slate-500">불러오는 중</main>;
+    return (
+      <main
+        className="grid min-h-[100dvh] place-items-center bg-slate-50 px-4"
+        aria-busy="true"
+        aria-label="SonTube 앱 준비 중"
+      >
+        <div className="w-full max-w-sm" role="status" aria-live="polite">
+          <p className="text-sm font-black text-ink">안전 영상서랍을 준비하고 있어요</p>
+          <div className="mt-3 grid gap-2" aria-hidden="true">
+            <span className="h-3 w-3/4 animate-pulse rounded bg-slate-200 motion-reduce:animate-none" />
+            <span className="h-3 w-1/2 animate-pulse rounded bg-slate-200 motion-reduce:animate-none" />
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
+    <main className="min-h-[100dvh] bg-slate-50 text-slate-900">
       <header className="border-b border-slate-200 bg-white px-4 py-4 md:px-6">
         <div className="mx-auto grid max-w-7xl gap-4 md:grid-cols-[1fr_auto] md:items-center">
           <div>
@@ -356,11 +404,20 @@ export function AppShell() {
               <span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-bold text-amber-700">샘플 화면</span>
             )}
             <button
+              ref={settingsButtonRef}
               type="button"
               onClick={requestSettings}
               aria-label="설정"
+              aria-expanded={settingsOpen || parentGateOpen || isInitialSetup}
+              aria-controls={
+                parentGateOpen
+                  ? "parent-gate-region"
+                  : settingsOpen || isInitialSetup
+                    ? "parent-settings-region"
+                    : undefined
+              }
               title="설정"
-              className="grid h-9 w-9 place-items-center rounded-full text-slate-500 opacity-40 transition hover:bg-slate-100 hover:opacity-80 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
+              className="grid h-11 w-11 place-items-center rounded-full text-slate-500 opacity-40 transition hover:bg-slate-100 hover:opacity-80 active:scale-[0.98] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 motion-reduce:transform-none motion-reduce:transition-none"
             >
               <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.7">
                 <path d="M9.6 3.4h4.8l.5 2a7.5 7.5 0 0 1 1.4.8l2-.6 2.4 4.1-1.5 1.4a7 7 0 0 1 0 1.8l1.5 1.4-2.4 4.1-2-.6a7.5 7.5 0 0 1-1.4.8l-.5 2H9.6l-.5-2a7.5 7.5 0 0 1-1.4-.8l-2 .6-2.4-4.1 1.5-1.4a7 7 0 0 1 0-1.8L3.3 9.7l2.4-4.1 2 .6a7.5 7.5 0 0 1 1.4-.8l.5-2Z" />
@@ -372,30 +429,39 @@ export function AppShell() {
       </header>
 
       {parentGateOpen && (
-        <section className="border-b border-slate-200 bg-white px-4 py-4 md:px-6">
+        <section id="parent-gate-region" aria-labelledby="parent-gate-title" className="border-b border-slate-200 bg-white px-4 py-4 md:px-6">
           <form onSubmit={submitParentGate} className="mx-auto grid max-w-lg gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
             <div>
-              <h2 className="text-lg font-black text-ink">부모님 확인</h2>
+              <h2 id="parent-gate-title" className="text-lg font-black text-ink">부모님 확인</h2>
               <p className="mt-1 text-sm text-slate-600">설정 화면을 열려면 간단한 확인을 완료해 주세요.</p>
             </div>
             <label className="grid gap-1 text-sm font-black text-slate-700">
               {parentChallenge.left} + {parentChallenge.right} = ?
               <input
+                ref={parentAnswerRef}
+                id="parent-answer"
+                name="parentAnswer"
                 value={parentAnswer}
                 onChange={(event) => setParentAnswer(event.target.value)}
                 inputMode="numeric"
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ocean focus:ring-2 focus:ring-sky-100"
+                pattern="[0-9]*"
+                autoComplete="off"
+                enterKeyHint="done"
+                required
+                aria-invalid={parentGateError ? true : undefined}
+                aria-describedby={parentGateError ? "parent-gate-error" : undefined}
+                className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ocean focus:ring-2 focus:ring-sky-100"
               />
             </label>
-            {parentGateError && <p className="text-sm font-semibold text-red-700">{parentGateError}</p>}
+            {parentGateError && <p id="parent-gate-error" className="text-sm font-semibold text-red-700" role="alert">{parentGateError}</p>}
             <div className="flex flex-wrap gap-2">
-              <button type="submit" className="rounded-md bg-ink px-4 py-2 text-sm font-black text-white hover:bg-slate-700">
+              <button type="submit" className="min-h-11 rounded-md bg-ink px-4 py-2 text-sm font-black text-white hover:bg-slate-700">
                 확인
               </button>
-              <button
-                type="button"
-                onClick={() => setParentGateOpen(false)}
-                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 hover:border-ocean hover:text-ocean"
+                <button
+                  type="button"
+                  onClick={closeParentGate}
+                className="min-h-11 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 hover:border-ocean hover:text-ocean"
               >
                 닫기
               </button>
@@ -405,21 +471,30 @@ export function AppShell() {
       )}
 
       {settingsOpen || isInitialSetup ? (
-        <section className="border-b border-slate-200 bg-white px-4 py-5 md:px-6">
+        <section id="parent-settings-region" aria-labelledby="app-key-settings-title" className="border-b border-slate-200 bg-white px-4 py-5 md:px-6">
           <div className="mx-auto grid max-w-7xl gap-4 md:grid-cols-[1fr_1fr]">
             <form onSubmit={submitKey} className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
               <div>
-                <h2 className="text-lg font-black text-ink">앱 키 등록</h2>
+                <h2 id="app-key-settings-title" className="text-lg font-black text-ink">앱 키 등록</h2>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
                   부모님 관리자 화면의 앱 키 메뉴에서 만든 키를 확인합니다. 서버가 정상 승인한 뒤에만 기존 키와 목록을 교체합니다.
                 </p>
               </div>
+              <label htmlFor="app-key-input" className="text-sm font-black text-slate-700">
+                {hasRegisteredKey ? "교체할 새 앱 키" : "앱 키"}
+              </label>
               <input
+                ref={appKeyInputRef}
+                id="app-key-input"
+                name="appKey"
                 value={keyInput}
                 onChange={(event) => setKeyInput(event.target.value)}
                 placeholder={hasRegisteredKey ? "새 키로 교체하려면 입력" : "st_app_..."}
                 type="password"
                 autoComplete="off"
+                spellCheck={false}
+                aria-label={hasRegisteredKey ? "교체할 새 앱 키" : "앱 키"}
+                aria-describedby={message ? "app-key-message" : undefined}
                 className="rounded-md border border-slate-300 px-3 py-3 font-mono text-sm outline-none focus:border-ocean focus:ring-2 focus:ring-sky-100"
               />
               {hasRegisteredKey && <p className="text-xs font-semibold text-slate-500">등록된 키: {access?.keyPrefix ?? "st_app_..."}...</p>}
@@ -427,21 +502,32 @@ export function AppShell() {
                 <button
                   type="submit"
                   disabled={isSyncing || !keyInput.trim()}
-                  className="rounded-md bg-ink px-4 py-2 text-sm font-black text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  aria-busy={isSyncing}
+                  className="min-h-11 rounded-md bg-ink px-4 py-2 text-sm font-black text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {hasRegisteredKey ? "새 키 확인 후 교체" : "등록하고 불러오기"}
                 </button>
                 {hasRegisteredKey && (
                   <button
                     type="button"
-                    onClick={() => setSettingsOpen(false)}
-                    className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 hover:border-ocean hover:text-ocean"
+                    onClick={closeSettings}
+                    className="min-h-11 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 hover:border-ocean hover:text-ocean"
                   >
                     닫기
                   </button>
                 )}
               </div>
-              {message && <p className="text-sm font-semibold text-slate-700">{message}</p>}
+              {message && (
+                <p
+                  id="app-key-message"
+                  className={`text-sm font-semibold ${messageTone === "error" ? "text-red-700" : "text-slate-700"}`}
+                  role={messageTone === "error" ? "alert" : "status"}
+                  aria-live={messageTone === "error" ? "assertive" : "polite"}
+                  aria-atomic="true"
+                >
+                  {message}
+                </p>
+              )}
             </form>
 
             <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
@@ -499,11 +585,12 @@ export function AppShell() {
                 <iframe
                   key={activeVideo.id}
                   src={buildEmbedUrl(activeVideo.youtubeVideoId)}
-                  title={activeVideo.title}
+                  title={`${activeVideo.title} YouTube 플레이어`}
                   className="aspect-video w-full"
                   sandbox="allow-scripts allow-same-origin allow-presentation"
                   allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
+                  referrerPolicy="strict-origin-when-cross-origin"
                 />
               ) : (
                 <div className="grid aspect-video place-items-center bg-slate-900 text-sm font-semibold text-white">
@@ -519,13 +606,13 @@ export function AppShell() {
                   {activeVideo.channel && (
                     <p className="text-xs font-bold text-slate-500">{activeVideo.channel.name}</p>
                   )}
-                  {activeVideo.description && <p className="text-sm leading-6 text-slate-600">{activeVideo.description}</p>}
+                  {activeVideo.description && <p className="break-words text-sm leading-6 text-slate-600">{activeVideo.description}</p>}
                   <div className="flex flex-wrap gap-2">
                     {activeVideo.tags.map((tag) => (
                       <span
                         key={tag.id}
                         className="rounded-md px-2 py-1 text-xs font-black"
-                        style={{ backgroundColor: `${tag.color ?? "#0369a1"}22`, color: tag.color ?? "#0369a1" }}
+                        style={{ backgroundColor: `${tag.color ?? "#0369a1"}22`, color: "#334155" }}
                       >
                         {tag.name}
                       </span>
@@ -542,7 +629,7 @@ export function AppShell() {
                       onClick={
                         selectedChannelId === activeVideo.channel.id ? showAllVideos : showActiveChannelVideos
                       }
-                      className="w-fit rounded-md bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                      className="inline-flex min-h-11 w-fit items-center rounded-md bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
                     >
                       {selectedChannelId === activeVideo.channel.id
                         ? "전체 목록으로"
@@ -556,7 +643,7 @@ export function AppShell() {
                     type="button"
                     onClick={() => togglePlaylist(activeVideo)}
                     aria-pressed={playlist.some((item) => item.id === activeVideo.id)}
-                    className={`rounded-md px-3 py-2 text-sm font-black ${
+                    className={`min-h-11 rounded-md px-3 py-2 text-sm font-black ${
                       playlist.some((item) => item.id === activeVideo.id)
                         ? "bg-coral text-white"
                         : "border border-slate-300 bg-white text-slate-700 hover:border-coral"
@@ -570,7 +657,7 @@ export function AppShell() {
                       type="button"
                       onClick={() => recordFeedback(activeVideo, option.type)}
                       aria-pressed={feedbackByVideoId[activeVideo.id] === option.type}
-                      className={`rounded-md border px-3 py-2 text-sm font-black transition ${
+                      className={`min-h-11 rounded-md border px-3 py-2 text-sm font-black transition ${
                         feedbackByVideoId[activeVideo.id] === option.type
                           ? "border-ink bg-ink text-white"
                           : getFeedbackClassName(option.tone)
@@ -589,10 +676,14 @@ export function AppShell() {
               <label className="grid gap-1 text-sm font-black text-slate-700">
                 제목/키워드 검색
                 <input
+                  type="search"
+                  name="catalogQuery"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="예: 동물, 과학, 영어"
-                  className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ocean focus:ring-2 focus:ring-sky-100"
+                  autoComplete="off"
+                  enterKeyHint="search"
+                  className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ocean focus:ring-2 focus:ring-sky-100"
                 />
               </label>
               {selectedChannel && (
@@ -603,7 +694,7 @@ export function AppShell() {
                   <button
                     type="button"
                     onClick={showAllVideos}
-                    className="shrink-0 text-xs font-black text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-700"
+                    className="inline-flex min-h-11 shrink-0 items-center text-xs font-black text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-700"
                   >
                     전체 목록으로
                   </button>
@@ -675,13 +766,13 @@ function OfflineSampleCatalog({
           <p className="mt-1 text-sm leading-6 text-slate-600">
             지정된 통신 환경을 확인하지 못해 검색·태그·카드 배치 검수용 샘플만 표시합니다. 이 카드는 재생되지 않습니다.
           </p>
-          {message && <p className="mt-2 text-sm font-semibold text-amber-800">{message}</p>}
+          {message && <p className="mt-2 text-sm font-semibold text-amber-800" role="alert" aria-live="assertive" aria-atomic="true">{message}</p>}
         </div>
         <button
           type="button"
           onClick={onRetry}
           disabled={isChecking}
-          className="rounded-md border border-amber-300 bg-white px-4 py-2 text-sm font-black text-amber-800 hover:border-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-h-11 rounded-md border border-amber-300 bg-white px-4 py-2 text-sm font-black text-amber-800 hover:border-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isChecking ? "연결 확인 중" : "연결 다시 확인"}
         </button>
@@ -691,10 +782,14 @@ function OfflineSampleCatalog({
         <label className="grid gap-1 text-sm font-black text-slate-700">
           샘플 제목/키워드 검색
           <input
+            type="search"
+            name="sampleQuery"
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder="예: 동물, 과학, 영어"
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ocean focus:ring-2 focus:ring-sky-100"
+            autoComplete="off"
+            enterKeyHint="search"
+            className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ocean focus:ring-2 focus:ring-sky-100"
           />
         </label>
         <div className="flex flex-wrap gap-2">
@@ -713,7 +808,7 @@ function OfflineSampleCatalog({
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {videos.length === 0 && (
-          <p className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-slate-500 sm:col-span-2 lg:col-span-3">
+          <p className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-slate-500 sm:col-span-2 lg:col-span-3" role="status">
             조건에 맞는 샘플이 없습니다.
           </p>
         )}
@@ -760,19 +855,27 @@ function VideoRail({
         <h2 className="text-base font-black text-ink">{title}</h2>
         <span className="text-xs font-bold text-slate-500">{videos.length}개</span>
       </div>
-      <div className="grid max-h-[520px] gap-2 overflow-y-auto pr-1">
-        {videos.length === 0 && <p className="rounded-md bg-slate-50 px-3 py-4 text-center text-sm text-slate-500">표시할 영상이 없습니다.</p>}
+      <div className="grid max-h-[520px] gap-2 overflow-y-auto overscroll-contain pr-1">
+        {videos.length === 0 && <p className="rounded-md bg-slate-50 px-3 py-4 text-center text-sm text-slate-500" role="status">표시할 영상이 없습니다.</p>}
         {videos.map((video) => (
           <button
             key={video.id}
             type="button"
             onClick={() => onChoose(video.id)}
-            className={`grid grid-cols-[96px_1fr] gap-3 rounded-md border p-2 text-left transition ${
+            aria-pressed={activeVideoId === video.id}
+            aria-label={`${video.title} 재생`}
+            className={`grid min-h-11 grid-cols-[96px_1fr] gap-3 rounded-md border p-2 text-left transition active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ocean focus-visible:ring-offset-2 motion-reduce:transform-none motion-reduce:transition-none ${
               activeVideoId === video.id ? "border-ink bg-slate-100" : "border-slate-200 bg-white hover:border-ocean"
             }`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={video.thumbnailUrl} alt="" className="aspect-video w-24 rounded-md object-cover" />
+            <img
+              src={video.thumbnailUrl}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="aspect-video w-24 rounded-md object-cover"
+            />
             <span className="grid min-w-0 content-center gap-1">
               <span className="line-clamp-2 break-words text-sm font-black text-ink">{video.title}</span>
               {video.channel && (
@@ -792,7 +895,8 @@ function TagButton({ active, onClick, children }: { active: boolean; onClick: ()
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-md border px-3 py-2 text-xs font-black ${
+      aria-pressed={active}
+      className={`min-h-11 rounded-md border px-3 py-2 text-xs font-black transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ocean focus-visible:ring-offset-2 motion-reduce:transform-none motion-reduce:transition-none ${
         active ? "border-ink bg-ink text-white" : "border-slate-300 bg-white text-slate-700 hover:border-ocean"
       }`}
     >

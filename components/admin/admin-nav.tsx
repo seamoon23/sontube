@@ -36,7 +36,7 @@ export function AdminNav() {
                 key={item.href}
                 href={item.href}
                 aria-current={isExact ? "page" : isActive ? "location" : undefined}
-                className={`min-h-11 rounded-md px-3 py-3 text-sm font-medium transition ${
+                className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-md px-3 py-3 text-sm font-medium transition ${
                   isActive
                     ? "bg-slate-100 text-ink"
                     : "text-slate-700 hover:bg-slate-100 hover:text-ink"

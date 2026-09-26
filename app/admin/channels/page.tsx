@@ -36,7 +36,7 @@ export default async function AdminChannelsPage() {
         </div>
         <Link
           href="/admin/videos/new"
-          className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+          className="inline-flex min-h-11 items-center rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
         >
           새 영상 등록
         </Link>

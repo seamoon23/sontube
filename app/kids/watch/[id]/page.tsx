@@ -33,12 +33,13 @@ export default async function KidsWatchPage({ params }: WatchPageProps) {
   if (!video) notFound();
 
   return (
-    <main className="min-h-screen bg-ink text-white">
+    <main className="min-h-[100dvh] bg-ink text-white">
       <div className="mx-auto grid max-w-6xl gap-5 px-4 py-5 md:px-8">
         <div className="flex items-center justify-between gap-3">
           <Link
             href="/kids"
-            className="rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/20"
+            aria-label="영상서랍으로 돌아가기"
+            className="inline-flex min-h-11 items-center rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-ink motion-reduce:transition-none"
           >
             돌아가기
           </Link>
@@ -51,19 +52,20 @@ export default async function KidsWatchPage({ params }: WatchPageProps) {
           </div>
         </div>
 
-        <section className="grid gap-4">
+        <section className="grid gap-4" aria-labelledby="kids-watch-title">
           <div className="aspect-video overflow-hidden rounded-lg bg-black shadow-soft">
             <iframe
               src={buildEmbedUrl(video.youtubeVideoId)}
-              title={video.title}
+              title={`${video.title} YouTube 플레이어`}
               className="h-full w-full"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
             />
           </div>
           <div className="grid gap-2">
-            <h1 className="text-2xl font-black md:text-3xl">{video.title}</h1>
-            {video.description && <p className="max-w-3xl text-sm leading-6 text-slate-200">{video.description}</p>}
+            <h1 id="kids-watch-title" className="break-words text-2xl font-black md:text-3xl">{video.title}</h1>
+            {video.description && <p className="max-w-3xl break-words text-sm leading-6 text-slate-200">{video.description}</p>}
             <div className="pt-2">
               <KidsPlaylistButton
                 item={{

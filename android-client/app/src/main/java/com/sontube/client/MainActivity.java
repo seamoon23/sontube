@@ -96,6 +96,12 @@ public final class MainActivity extends Activity {
         navigationPolicy = new NavigationPolicy(BuildConfig.SONTUBE_APP_URL);
         connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            findViewById(R.id.error_title).setAccessibilityHeading(true);
+            findViewById(R.id.sample_list_title).setAccessibilityHeading(true);
+            errorPanel.setAccessibilityPaneTitle(getString(R.string.load_error_title));
+        }
+
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);

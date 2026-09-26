@@ -1,9 +1,12 @@
+import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   ADMIN_IMPERSONATION_SESSION_MAX_AGE_SECONDS,
   createAdminSessionToken,
   createImpersonatedAdminSessionToken,
   hashAdminPassword,
+  getAdminAllowedEmails,
+  isAdminEmailAllowed,
   isAdminAuthConfigured,
   parseAdminSessionToken,
   verifyAdminPassword,
@@ -15,12 +18,51 @@ const identity = {
   familyId: "family_1",
   email: "parent@example.com",
   displayName: "테스트 부모",
+  sessionVersion: 1,
 };
+
+function createSignedTestToken(secret: string, payload: Record<string, unknown>): string {
+  const encodedPayload = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const signature = createHmac("sha256", secret).update(encodedPayload).digest("hex");
+  return `${encodedPayload}.${signature}`;
+}
 
 describe("admin auth helpers", () => {
   it("detects whether parent session signing is configured", () => {
     expect(isAdminAuthConfigured({})).toBe(false);
-    expect(isAdminAuthConfigured({ SESSION_SECRET: "secret" })).toBe(true);
+    expect(isAdminAuthConfigured({ SESSION_SECRET: "secret" })).toBe(false);
+    expect(
+      isAdminAuthConfigured({
+        SESSION_SECRET: "secret",
+        ADMIN_ALLOWED_EMAILS: "parent@example.com,partner@example.com",
+      }),
+    ).toBe(true);
+    expect(
+      isAdminAuthConfigured({
+        SESSION_SECRET: "secret",
+        ADMIN_ALLOWED_EMAILS: "parent@example.com",
+      }),
+    ).toBe(false);
+  });
+
+  it("normalizes and enforces the bounded parent email allowlist", () => {
+    const env = {
+      ADMIN_ALLOWED_EMAILS: " Parent@Example.com,partner@example.com,parent@example.com ",
+    };
+
+    expect(getAdminAllowedEmails(env)).toEqual([
+      "parent@example.com",
+      "partner@example.com",
+    ]);
+    expect(isAdminEmailAllowed("PARENT@example.com", env)).toBe(true);
+    expect(isAdminEmailAllowed("visitor@example.com", env)).toBe(false);
+    expect(getAdminAllowedEmails({ ADMIN_ALLOWED_EMAILS: "not-an-email" })).toEqual([]);
+    expect(getAdminAllowedEmails({ ADMIN_ALLOWED_EMAILS: "parent@example.com" })).toEqual([]);
+    expect(
+      getAdminAllowedEmails({
+        ADMIN_ALLOWED_EMAILS: "one@example.com,two@example.com,three@example.com",
+      }),
+    ).toEqual([]);
   });
 
   it("hashes and verifies a parent password without storing plain text", () => {
@@ -80,5 +122,21 @@ describe("admin auth helpers", () => {
     expect(() =>
       createAdminSessionToken(secret, { ...identity, familyId: " " }, issuedAt),
     ).toThrow(TypeError);
+    expect(() =>
+      createAdminSessionToken(secret, { ...identity, sessionVersion: 0 }, issuedAt),
+    ).toThrow(TypeError);
+    expect(
+      parseAdminSessionToken(
+        createSignedTestToken(secret, {
+          userId: identity.userId,
+          familyId: identity.familyId,
+          email: identity.email,
+          displayName: identity.displayName,
+          issuedAt: issuedAt.getTime(),
+        }),
+        secret,
+        issuedAt,
+      ),
+    ).toBeNull();
   });
 });

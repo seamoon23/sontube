@@ -117,6 +117,13 @@ export async function logoutSuperAdminAction(): Promise<void> {
     maxAge: 0,
     path: "/",
   });
+  cookieStore.set(ADMIN_SESSION_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 0,
+    path: "/",
+  });
   redirect("/superadmin/login");
 }
 
@@ -130,15 +137,6 @@ export async function endImpersonationAction(): Promise<void> {
     redirect("/superadmin/users?error=" + encodeURIComponent("유효한 대체 로그인 세션을 찾을 수 없습니다."));
   }
 
-  await prisma.superAdminAuditLog.create({
-    data: {
-      action: "IMPERSONATION_ENDED",
-      actorId: superAdminSession.loginId,
-      targetFamilyId: parentSession.familyId,
-      targetUserId: parentSession.userId,
-    },
-  });
-
   cookieStore.set(ADMIN_SESSION_COOKIE, "", {
     httpOnly: true,
     sameSite: "lax",
@@ -146,6 +144,19 @@ export async function endImpersonationAction(): Promise<void> {
     maxAge: 0,
     path: "/",
   });
+
+  try {
+    await prisma.superAdminAuditLog.create({
+      data: {
+        action: "IMPERSONATION_ENDED",
+        actorId: superAdminSession.loginId,
+        targetFamilyId: parentSession.familyId,
+        targetUserId: parentSession.userId,
+      },
+    });
+  } catch {
+    // 세션 종료는 감사 저장소 장애와 무관하게 완료되어야 합니다.
+  }
   redirect("/superadmin/users?notice=" + encodeURIComponent("대체 로그인을 종료했습니다."));
 }
 export async function createFamilyAction(formData: FormData): Promise<void> {
@@ -244,6 +255,10 @@ export async function toggleFamilyActiveAction(formData: FormData): Promise<void
       if (!family) throw new ActionValidationError("가족을 찾을 수 없습니다.");
       nextActive = !family.isActive;
       await tx.family.update({ where: { id: familyId }, data: { isActive: nextActive } });
+      await tx.parentUser.updateMany({
+        where: { familyId },
+        data: { sessionVersion: { increment: 1 } },
+      });
       await tx.superAdminAuditLog.create({
         data: {
           action: nextActive ? "FAMILY_ACTIVATED" : "FAMILY_DEACTIVATED",
@@ -272,7 +287,13 @@ export async function toggleParentUserActiveAction(formData: FormData): Promise<
       const user = await tx.parentUser.findUnique({ where: { id: userId } });
       if (!user) throw new ActionValidationError("보호자 계정을 찾을 수 없습니다.");
       nextActive = !user.isActive;
-      await tx.parentUser.update({ where: { id: userId }, data: { isActive: nextActive } });
+      await tx.parentUser.update({
+        where: { id: userId },
+        data: {
+          isActive: nextActive,
+          sessionVersion: { increment: 1 },
+        },
+      });
       await tx.superAdminAuditLog.create({
         data: {
           action: nextActive ? "PARENT_USER_ACTIVATED" : "PARENT_USER_DEACTIVATED",
@@ -304,7 +325,10 @@ export async function resetParentPasswordAction(formData: FormData): Promise<voi
       if (!user) throw new ActionValidationError("보호자 계정을 찾을 수 없습니다.");
       await tx.parentUser.update({
         where: { id: userId },
-        data: { passwordHash: hashAdminPassword(password, sessionSecret) },
+        data: {
+          passwordHash: hashAdminPassword(password, sessionSecret),
+          sessionVersion: { increment: 1 },
+        },
       });
       await tx.superAdminAuditLog.create({
         data: {
@@ -350,6 +374,7 @@ export async function startImpersonationAction(formData: FormData): Promise<void
         familyId: true,
         email: true,
         displayName: true,
+        sessionVersion: true,
       },
     });
     if (!user) {
@@ -377,6 +402,7 @@ export async function startImpersonationAction(formData: FormData): Promise<void
         familyId: user.familyId,
         email: user.email,
         displayName: user.displayName,
+        sessionVersion: user.sessionVersion,
       },
       session.loginId,
       issuedAt,

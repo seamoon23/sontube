@@ -37,10 +37,10 @@ export function KidsFeedbackButtons({ videoId }: { videoId: string }) {
   }
 
   return (
-    <div className="grid gap-3 rounded-lg border border-white/10 bg-white/5 p-4">
+    <section className="grid gap-3 rounded-lg border border-white/10 bg-white/5 p-4" aria-labelledby="kids-feedback-title">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-black text-white">어땠어?</h2>
-        <span className="min-h-5 text-sm font-semibold text-sky-100" role="status">
+        <h2 id="kids-feedback-title" className="text-lg font-black text-white">어땠어?</h2>
+        <span className="min-h-5 text-sm font-semibold text-sky-100" role="status" aria-live="polite" aria-atomic="true">
           {isSaving ? "저장 중" : message}
         </span>
       </div>
@@ -51,7 +51,7 @@ export function KidsFeedbackButtons({ videoId }: { videoId: string }) {
             type="button"
             onClick={() => choose(option.type)}
             aria-pressed={selected === option.type}
-            className={`rounded-md border px-3 py-2 text-sm font-bold transition ${
+            className={`min-h-11 rounded-md border px-3 py-2 text-sm font-bold transition active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-ink motion-reduce:transform-none motion-reduce:transition-none ${
               selected === option.type ? "border-white bg-white text-ink" : toneClassNames[option.tone]
             }`}
           >
@@ -59,6 +59,6 @@ export function KidsFeedbackButtons({ videoId }: { videoId: string }) {
           </button>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

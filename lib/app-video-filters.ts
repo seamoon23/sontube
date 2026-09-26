@@ -11,7 +11,7 @@ export function filterAppCatalogVideos(
   return videos.filter((video) => {
     const matchesTag = selectedTag ? video.tags.some((tag) => tag.slug === selectedTag) : true;
     const matchesChannel = selectedChannelId ? video.channel?.id === selectedChannelId : true;
-    const haystack = [video.title, video.description, video.searchKeywords, ...video.tags.map((tag) => tag.name)]
+    const haystack = [video.title, video.searchKeywords, ...video.tags.map((tag) => tag.name)]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();

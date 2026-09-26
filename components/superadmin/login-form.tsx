@@ -45,7 +45,10 @@ export function SuperAdminLoginForm({ setupRequired }: { setupRequired: boolean 
         <div className="grid gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
           <p className="font-bold">최종관리자 환경설정이 필요합니다.</p>
           <p>시작 위치: <code>C:\codex\app\sontube</code>의 PowerShell</p>
-          <code className="overflow-x-auto rounded-lg bg-slate-900 px-3 py-2 text-xs text-slate-50">
+          <code
+            tabIndex={0}
+            className="block max-w-full overflow-x-auto whitespace-nowrap rounded-lg bg-slate-900 px-3 py-2 text-xs text-slate-50"
+          >
             npm run auth:hash -- &lt;최종관리자비밀번호&gt; &lt;SUPERADMIN_SESSION_SECRET&gt;
           </code>
           <p>
@@ -67,6 +70,7 @@ export function SuperAdminLoginForm({ setupRequired }: { setupRequired: boolean 
               autoComplete="username"
               required
               aria-invalid={hasError || undefined}
+              aria-describedby={hasError ? "superadmin-login-error" : undefined}
               className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-base outline-none focus:border-teal-700 focus:ring-2 focus:ring-teal-100"
             />
           </label>

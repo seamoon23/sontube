@@ -9,6 +9,7 @@ SonTube는 보호자가 직접 승인한 YouTube 영상만 아이가 제한형 �
 - 보호자: PC 또는 모바일 브라우저의 `/admin`
 - 아이: `android-client/`로 빌드한 주소창 없는 Android 앱
 - 앱 콘텐츠 화면: 서버의 `/app`
+- 공개 방문자: 부모용 소개 `/`와 운영자가 명시 공개한 공용 체험 `/lite`
 
 ## Product Principles
 
@@ -26,15 +27,16 @@ SonTube는 보호자가 직접 승인한 YouTube 영상만 아이가 제한형 �
 - 아이 내부 검색, 태그 필터, 부모 최근 추천과 핫태그
 - 아이 로컬 재생목록과 짧은 영상 피드백
 - 부모 관심 요약과 외부 AI 도구용 복사 프롬프트
-- 앱 키 등록, 설치 ID 바인딩, 14일 체험과 24시간 카탈로그 동기화
+- 앱 키 등록, 설치 ID 바인딩, 14일 체험과 앱 시작·복귀 시 버전 기반 카탈로그 동기화
 - 외부 최상위 URL을 차단하는 Android WebView 클라이언트
+- 부모 브로슈어, 읽기 전용 Lite 공용 카탈로그와 수동 계좌이체 운영 화면
 
 ## Immediate Priorities
 
-1. Android 실제 기기에서 재생, 전체 화면, 네트워크 오류와 외부 이동 차단 검증
-2. 일반 화면 고정과 관리형 기기 Lock Task 중 운영 방식 결정
-3. 앱 설정의 부모 PIN 또는 Android 기기 인증 보강
+1. 운영 보호자 두 계정과 경로별 Cloudflare Access를 실제 배포 환경에서 검증
+2. 영구 디스크 Node 호스트, SQLite·업로드 동시 백업과 복구 절차 준비
+3. Android 실제 기기에서 재생, 전체 화면, 네트워크 오류와 외부 이동 차단 검증
 4. 서버 rate limit의 영속 저장소 또는 배포 환경 middleware 검토
-5. 웹 결제 entitlement와 스토어 정책 검토
+5. SonTube 전용 Supabase와 정적 Pages 전환 설계, 앱 설정 기기 인증과 판매 정책 검토
 
 상세 상태와 다음 대화 프롬프트는 `docs/codex-handover.md`를 기준으로 한다.

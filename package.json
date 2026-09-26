@@ -21,7 +21,14 @@
     "db:migrate": "prisma migrate deploy",
     "db:status": "prisma migrate status",
     "db:seed": "tsx prisma/seed.ts",
-    "auth:hash": "node scripts/hash-admin-password.mjs"
+    "auth:hash": "node scripts/hash-admin-password.mjs",
+    "ops:preflight": "node --env-file-if-exists=.env scripts/check-production-env.mjs",
+    "ops:backup": "node --env-file-if-exists=.env scripts/backup-restore.mjs backup",
+    "ops:backup:dry-run": "node --env-file-if-exists=.env scripts/backup-restore.mjs backup --dry-run",
+    "ops:backup:verify": "node --env-file-if-exists=.env scripts/backup-restore.mjs verify",
+    "ops:restore": "node --env-file-if-exists=.env scripts/backup-restore.mjs restore",
+    "ops:restore:plan": "node --env-file-if-exists=.env scripts/backup-restore.mjs restore --dry-run",
+    "ops:restore:force": "node --env-file-if-exists=.env scripts/backup-restore.mjs restore --force"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
@@ -37,6 +44,7 @@
     "@types/node": "^22.15.34",
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",
+    "ajv": "^6.15.0",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.29.0",
     "eslint-config-next": "^15.3.4",

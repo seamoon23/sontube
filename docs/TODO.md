@@ -24,7 +24,7 @@
 - [x] 타입·린트·테스트·빈 DB migration·프로덕션 빌드 통합 검증과 Web CI
 - [x] Android 정책 순수 Java 통합 명령과 별도 CI
 - [x] 기본 웹 보안 응답 헤더 적용
-- [x] 관리자·아이·API 경로 robots 차단과 no-store 응답
+- [x] 관리자·아이·보호 API 경로 robots 차단과 no-store 응답(Lite 공개 API 예외)
 - [ ] 추천 태그 규칙 편집 UI
 - [ ] Android/모바일 실제 기기 QA
 - [ ] 접근성 스크린리더 세부 점검
@@ -38,6 +38,32 @@
 - [x] 기존 영상의 채널 미지정 호환 migration
 - [x] 외부 채널 이동·자동 수집·YouTube API 없이 내부 승인 목록으로 제한
 - [x] 채널 이름 변경·비활성화·중복 채널 병합 관리
+
+## Public Web / Lite / Deployment
+
+- [x] 웹과 Android 단일 저장소 유지, 웹 배포와 Android 산출물 CI 분리 원칙 확정
+- [x] 공개 `/` 부모용 브로슈어, `/lite` 읽기 전용 공용 체험 경계 확정
+- [x] `Video.isLitePublished`·`liteSortOrder`와 안전 조건 기반 `GET /api/lite/catalog` 추가
+- [x] `/`에서 관리자·아이 QA 화면 직접 진입을 제거하고 부모용 소개·Lite·설치형 앱 안내로 교체
+- [x] `/lite` 공개 목록 UI, 빈·오류 상태, 검색·태그·채널 필터와 로컬 내 목록 구현 및 모바일 레이아웃 검증
+- [x] 실제 모바일 브라우저 뷰포트에서 Lite YouTube 재생·전체 화면 확장/닫기 회귀 QA
+- [ ] Lite를 실제 iOS/Android 일반 브라우저와 설치형 PWA에서 교차 검증
+- [x] `/lite`와 `/api/lite/*`의 초기 `noindex`, robots crawl 허용 및 상태별 공개 캐시 헤더 검증
+- [x] 관리자 영상 등록·수정의 명시적 Lite 공개 제어와 안전 조건 validation, 목록 배지 검증
+- [x] Lite JSON Schema와 실제 200/304/503 route 응답·weak ETag 계약 자동 검증
+- [x] `ADMIN_ALLOWED_EMAILS` 애플리케이션 allowlist 적용
+- [x] 비밀번호/계정/가족 상태 변경 시 보호자 세션 버전 폐기와 대체 로그인 읽기 전용 강제
+- [ ] 운영 환경에 관리자 이메일 정확히 두 개를 등록하고 두 계정 모두 로그인·세션 차단 회귀 테스트
+- [ ] 일반 보호자 계정을 두 운영자 밖으로 개방하기 전에 Lite 공개 전용 역할과 변경 감사 로그 분리
+- [ ] Cloudflare Access에 `/admin`, `/admin/*`, `/api/admin`, `/api/admin/*`, `/kids`, `/kids/*` 두 계정 정책 적용
+- [ ] Cloudflare Access에 `/superadmin`, `/superadmin/*` 소유자 한 명 정책 적용
+- [ ] 공개 `/`, `/lite`, `/api/lite/*`, `/app`, `/api/app/*`가 Access 로그인 없이 열리는지 확인
+- [x] SQLite·업로드 동시 백업/검증/복구 CLI와 운영 환경 사전점검·DB 헬스체크 준비
+- [ ] 선택한 영구 디스크 Node 호스트에서 실제 백업 보관·복구 훈련
+- [x] 웹 CI와 Android 로직/debug APK CI를 독립 경로로 구성
+- [ ] Android release signing APK/AAB CI와 수동 승인 배포 구성
+- [ ] SonTube 전용 Supabase PostgreSQL·Auth·RLS·Storage·Edge Function 이관 설계 및 RLS 격리 테스트
+- [ ] 정적 SPA/PWA 재구성 후 SonTube 전용 Cloudflare Pages 프로젝트로 전환
 
 ## App Sync / Android Client
 
@@ -96,5 +122,5 @@
 - [ ] 현금영수증 전용 암호화 저장·마스킹·보존 정책
 - [ ] 부분 환불과 기간 비례 정산 정책
 - [ ] 결제·환불 CSV 대사 내보내기
-- [ ] SQLite 단일 인스턴스에서 관리형 DB로 전환할 운영 기준 확정
+- [x] SQLite 단일 인스턴스는 1차 운영까지만 사용하고 관리형 DB 전환 기준 확정
 - [ ] 테마샵은 실제 유료 이용자 반응 확인 후 상품·IP·환불 정책과 함께 별도 설계

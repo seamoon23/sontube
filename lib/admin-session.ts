@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   ADMIN_SESSION_COOKIE,
+  isAdminEmailAllowed,
   isAdminAuthConfigured,
   parseAdminSessionToken,
   type AdminSessionPayload,
@@ -39,10 +40,15 @@ export async function requireAdminSession(): Promise<AdminSessionContext> {
       familyId: true,
       email: true,
       displayName: true,
+      sessionVersion: true,
     },
   });
 
-  if (!user) {
+  if (
+    !user ||
+    user.sessionVersion !== session.sessionVersion ||
+    (!session.impersonatedBy && !isAdminEmailAllowed(user.email, process.env))
+  ) {
     redirect("/admin/login");
   }
 
@@ -51,6 +57,7 @@ export async function requireAdminSession(): Promise<AdminSessionContext> {
     familyId: user.familyId,
     email: user.email,
     displayName: user.displayName,
+    sessionVersion: user.sessionVersion,
     ...(session.impersonatedBy ? { impersonatedBy: session.impersonatedBy } : {}),
     issuedAt: session.issuedAt,
   };

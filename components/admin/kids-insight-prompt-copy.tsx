@@ -22,7 +22,7 @@ export function KidsInsightPromptCopy({ prompt }: { prompt: string }) {
         <button
           type="button"
           onClick={copyPrompt}
-          className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+          className="min-h-11 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
         >
           {status === "copied" ? "복사됨" : status === "failed" ? "직접 선택" : "복사"}
         </button>
@@ -34,7 +34,7 @@ export function KidsInsightPromptCopy({ prompt }: { prompt: string }) {
         className="min-h-80 w-full rounded-md border border-slate-300 bg-slate-50 p-4 text-sm leading-6 text-slate-700"
       />
       {status === "failed" && (
-        <p className="text-sm font-semibold text-amber-700" role="status">
+        <p className="text-sm font-semibold text-amber-700" role="alert" aria-live="assertive" aria-atomic="true">
           브라우저 복사가 막혀 있으면 프롬프트를 직접 선택해 복사해 주세요.
         </p>
       )}

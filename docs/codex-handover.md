@@ -1,12 +1,13 @@
 # SonTube Codex Handover
 
-Updated: 2026-08-30
+Updated: 2026-09-26
 
 ## Resume Point
 
 - Project root: `C:\codex\app\sontube`
 - Repository: `https://github.com/seamoon23/sontube.git`
 - Branch: `main`
+- Public web surface: parent brochure at `/` and read-only common catalog at `/lite`
 - Parent surface: Next.js administrator web UI
 - Child surface: native Android WebView client loading only `/app`
 
@@ -22,7 +23,7 @@ The child experience must not expose a general browser, address bar, administrat
 
 ### Parent Web
 
-- Family-scoped parent email/password authentication backed by `ParentUser` and `SESSION_SECRET`
+- Family-scoped parent email/password authentication backed by `ParentUser`, `SESSION_SECRET` and `ADMIN_ALLOWED_EMAILS`
 - Video registration, editing, filtering, safety state and publication state
 - Family-scoped channel management at `/admin/channels`, including rename, new-selection deactivation and duplicate merge
 - Existing-channel selection or direct channel-name entry during video registration and editing
@@ -37,7 +38,20 @@ The child experience must not expose a general browser, address bar, administrat
 - Administrator-only bottom sponsor/ad placeholder
 - Bounded process-local rate limiting for parent/superadmin login and payment/refund requests
 - `nosniff`, same-origin framing, referrer and restricted browser-capability response headers
-- Search indexing and shared caching disabled for administrator, child and API route families
+- Search indexing and shared caching disabled for administrator, child and protected API route families; the explicit Lite API is the public exception
+
+### Public Web / Lite
+
+- `/` is reserved for a parent-facing product brochure rather than a child or administrator entry point
+- `/lite` is a public, read-only common trial and is separate from the app-key family catalog
+- Lite is initially `noindex`; public availability does not imply search-indexing intent
+- A video enters Lite only when `isLitePublished`, `isPublished`, `PARENT_CHECKED` and an active family are all true
+- Lite order is `liteSortOrder` ascending, then recent update and stable ID order
+- `GET /api/lite/catalog` returns the AppCatalog-compatible public projection with `source: "LIVE"` and a weak ETag; browsers revalidate every response and shared CDN freshness is capped at 60 seconds
+- The checked-in JSON Schema is applied to the actual route 200 response in tests together with 304 and 503 cache behavior
+- Lite excludes family ID, original YouTube URL, app keys, payment, entitlement and server feedback data
+- An empty Lite catalog stays empty; it never falls back to Android samples or a private cached family catalog
+- Lite supports local search/filter/playback and a `localStorage` playlist only; device pinning and Wi-Fi enforcement remain Android responsibilities
 
 ### App Sync
 
@@ -57,7 +71,7 @@ The child experience must not expose a general browser, address bar, administrat
 
 - Key required before the catalog is shown
 - Local cache of the latest approved catalog
-- Search over parent-written title, description, search keywords and tags
+- Search over parent-written title, search keywords and tags; administrator description is not a search field
 - Optional channel labels and a same-channel view filtered locally to approved, public videos
 - Tag filters, hot tags and recent parent recommendations
 - Local child playlist
@@ -95,9 +109,14 @@ The child experience must not expose a general browser, address bar, administrat
 4. Manual prepaid bank-transfer payment is implemented for parent web with separate superadmin approval. Public sales still require real business, refund, receipt and store-distribution policy review.
 5. Rate limiting is bounded but process-local. Before multi-instance public hosting, configure a trusted proxy and replace it with a shared persistent limiter.
 6. Channel grouping never discovers or imports YouTube content. Parents still register each video individually, and the child app never opens an external channel page.
+7. The current dynamic Next.js, SQLite and local upload implementation is not a static Cloudflare Pages build. Use a single persistent-disk Node host first or complete the Supabase/static-app migration before Pages.
+8. Cloudflare Access is defense in depth for administrator paths. It must not replace SonTube sessions or intercept public Lite and Android app-key endpoints.
 
 ## Main Routes
 
+- `/`: public parent brochure
+- `/lite`: public read-only common catalog; no family/app-key features
+- `/api/lite/catalog`: public explicitly-published Lite catalog
 - `/admin/login`: administrator login
 - `/admin`: dashboard
 - `/admin/videos`: video list
@@ -116,6 +135,48 @@ The child experience must not expose a general browser, address bar, administrat
 
 The Android client intentionally blocks `/admin` and `/kids`.
 
+## Repository And Delivery Topology
+
+- Keep web and `android-client/` in this one repository while their shared API/catalog contract is evolving.
+- Run web verification/deployment and Android policy verification/signed artifact generation as independent CI pipelines.
+- A web-only change must not automatically publish an APK/AAB, and an Android artifact job must not deploy the web application.
+- Use a SonTube-specific deployment, database, storage and secrets boundary. Only the Cloudflare account and `jjunybox.com` DNS zone are shared with other jjunybox services.
+
+## Hosting Plan
+
+### Stage 1 - Current Next.js Runtime
+
+1. Deploy the dynamic Next.js server to one Node host with persistent disk.
+2. Keep SQLite and `public/uploads/thumbnails/` on persistent storage. Use `npm run ops:backup`, verify the manifest and perform a restore drill with application writes paused.
+3. Put the selected `jjunybox.com` subdomain behind Cloudflare DNS/TLS.
+4. Configure the path-scoped Cloudflare Access policies below without covering the public host as a whole.
+5. Run web production build, login boundaries, Lite exposure and Android physical-device regression tests before opening the domain.
+
+### Stage 2 - Cloudflare Pages And Supabase
+
+1. Create a separate SonTube Supabase project; do not reuse a Museum, Arcade or other service project.
+2. Migrate the schema to PostgreSQL, map parent users to Auth and enforce family ownership with RLS.
+3. Move custom thumbnails to service-specific Storage and privileged app-key, payment and superadmin operations to reviewed functions.
+4. Replace process-local rate limiting with a persistent or edge-coordinated limiter.
+5. Convert the web application to a static SPA/PWA and reproduce restricted-route headers, real 404 behavior and safe service-worker caching.
+6. Deploy the static output to a separate SonTube Cloudflare Pages project, migrate data with a write freeze and retain a tested rollback window.
+7. Rebuild Android with the final HTTPS `/app` URL and repeat key, playback, full-screen, escape-blocking and network-recovery QA.
+
+The existing `next build` + `next start`, Prisma/SQLite write path and Node filesystem thumbnail path cannot be copied directly to static Pages.
+
+## Cloudflare Access Manual Setup
+
+Start in Cloudflare Dashboard at `Zero Trust > Access controls > Applications`, then choose `Create new application > Self-hosted and private > Add public hostname`.
+
+1. Create `SonTube Admin`. Add both the parent path and its wildcard because a wildcard does not include the parent path: `/admin`, `/admin/*`, `/api/admin`, `/api/admin/*`, `/kids`, `/kids/*`.
+2. Add an `Allow` policy with `Include > Emails` containing exactly the same two operating-parent emails configured in `ADMIN_ALLOWED_EMAILS`.
+3. Create a separate `SonTube Superadmin` application for `/superadmin` and `/superadmin/*`. Its `Allow` policy contains only the owner's email.
+4. Do not create a hostname-wide Access rule. `/`, `/lite`, `/api/lite/*`, `/app` and `/api/app/*` must remain outside Access; `/api/app/*` continues to use app-key and installation-ID authorization.
+5. Test in a private browser window: public paths open without Access, the two parent emails can reach administrator paths, other emails cannot, and only the owner can reach superadmin paths. Passing Access must still lead to the SonTube login rather than bypassing it.
+6. Verify that the origin hostname or an alternate deployment URL cannot bypass the administrator Access policy. Restrict the origin or validate Access tokens if a direct origin remains reachable.
+
+Cloudflare references: [self-hosted applications](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/), [application paths](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/app-paths/).
+
 ## Local Web Setup
 
 From PowerShell:
@@ -128,7 +189,7 @@ npm run db:init
 npm run db:status
 ```
 
-Create `.env` from `.env.example`. Never commit `.env`.
+Create `.env` from `.env.example`. Never commit `.env`. Set `ADMIN_ALLOWED_EMAILS` to exactly the two active operating-parent emails, including the bootstrap email. Create the second `ParentUser` from `최종관리자 > 사용자` (`/superadmin/users`) after bootstrap setup.
 
 Create or reset the administrator password:
 
@@ -178,11 +239,20 @@ File > Open > C:\codex\app\sontube\android-client
 Build > Build Bundle(s) / APK(s) > Build APK(s)
 ```
 
+GitHub Actions debug artifact path:
+
+```text
+SonTube 저장소 > Actions > Android Debug APK > Run workflow
+완료된 실행 > Artifacts > sontube-android-debug-only-<commit SHA>
+```
+
+This workflow runs `lintDebug assembleDebug`, uses Android's standard debug signing and retains the artifact for 14 days. It does not publish a store release or deploy the web application.
+
 The APK is a local build artifact and is intentionally not committed.
 
 ## Last Verified
 
-The following passed on 2026-08-30:
+The following passed on 2026-09-26:
 
 ```powershell
 npm run verify:web
@@ -192,28 +262,34 @@ cd android-client
 .\gradlew.bat assembleDebug
 ```
 
-- Fresh temporary SQLite database: all 3 migrations applied; Prisma generate and validate passed
+- Fresh temporary SQLite database: all 5 migrations applied; Prisma generate and validate passed
 - TypeScript and ESLint: passed
-- Vitest: 20 files, 84 tests passed
+- Vitest: 34 files, 156 tests passed
 - Next.js production build: passed
-- Generated `/robots.txt` and sensitive-route noindex/no-store configuration tests: passed
+- Generated `/robots.txt`, Lite crawl/noindex exception and protected-route no-store configuration tests: passed
+- Lite JSON Schema against the actual 200 response, weak ETag 304 and 503 no-store tests: passed
+- Lite browser QA with a temporary six-item public catalog at 320 px, 390 px and 1440 px: no horizontal page overflow; search/filter/channel/empty-state/local playlist, real YouTube iframe load, viewport-sized full-screen focus and close recovery passed
+- Operational environment preflight and generic no-store DB health route tests: passed
+- SQLite VACUUM snapshot, thumbnail checksum manifest, tamper detection, overwrite refusal and force-restore rollback tests: passed
+- Independent Android debug-only APK workflow structure and local `lintDebug assembleDebug`: passed
 - Java `NavigationPolicySmokeTest`: passed
 - Java `WebViewLoadStateSmokeTest`: passed
 - Java `StartupPolicySmokeTest`: passed
 - Java `RuntimeNetworkGuardSmokeTest`: passed
 - Android `lintDebug`: 0 errors; only the deferred Gradle update advisory remains
 - Gradle 8.13 `assembleDebug`: passed
-- Prisma baseline, family/payment and video-channel migrations: fresh database and existing local database passed
+- Prisma baseline, family/payment, video-channel, Lite-catalog and parent-session-version migrations: fresh temporary database passed; run `prisma migrate deploy` before starting any existing deployment
 - Browser QA: parent/superadmin protected-route redirects and 390 px login layouts passed
 - Release HTTPS URL validation task: passed with a valid sample URL
 
 ## Current Emulator QA
 
 - Pixel XL emulator, Android 12 / API 32, Android System WebView 120.0.6099.193
-- Debug APK build/install, app-key registration, playback, full screen and Back recovery passed
+- 2026-08-30 debug APK reinstall, fresh app-key registration, three-item approved catalog sync and restart persistence passed
+- Official YouTube iframe playback reached the playing state; native full screen occupied 1440 x 2560 with system bars hidden, and Back restored `/app` and the bars
 - `/admin`, external URL, new-window and History API escape checks passed
 - Android app pinning reached `PINNED`; Back, Home and Recents remained in SonTube
-- Parent Wi-Fi policy endpoint, Android Wi-Fi transport gate and fail-closed native samples passed
+- With the local server stopped, the native fail-closed screen showed six non-playing samples and no WebView; restoring the server and tapping `연결 다시 확인` restored the registered three-item catalog
 - Unchanged `catalogVersion` returned `catalog: null`; invalid replacement key preserved the old key/cache
 - Open WebView changed to ten samples with zero iframes after the five-second connection timeout
 - Sample search returned the single expected `공룡 발자국 찾기` card
@@ -225,14 +301,14 @@ cd android-client
 
 ## Next Work Order
 
-1. Install the debug APK on at least one physical Android device.
-2. Test Wi-Fi-required and all-network policy modes on real Wi-Fi and mobile data.
-3. Repeat key registration, versioned sync, playback, full screen, escape blocking and network fallback/recovery.
-4. Record manufacturer-specific screen-pinning behavior and the exact unpin gesture.
-5. Decide whether ordinary screen pinning is sufficient or a managed-device Lock Task track is required.
-6. Add parent PIN or Android device authentication around app settings.
-7. Review persistent rate limiting and production database strategy before hosting.
-8. Review web payment entitlement and store policy only after the device experience is stable.
+1. Configure two real operating-parent accounts in `ADMIN_ALLOWED_EMAILS` and test allowed/denied logins without recording the addresses.
+2. Select the persistent-disk Node host, run the checked-in preflight and backup/restore drill there, and configure path-scoped Cloudflare Access.
+3. Install the release-candidate APK on at least one physical Android device using the final HTTPS `/app` URL.
+4. On a physical device, test Wi-Fi-required and all-network modes, versioned sync, Android/Lite playback, full screen, escape blocking, manufacturer pinning and recovery.
+5. Replace the process-local limiter before multi-instance or serverless public operation.
+6. Plan the separate SonTube Supabase migration and static Pages conversion; do not attach SonTube to another service's project.
+7. Add Android device authentication around app settings and complete payment/store-policy review before broader release.
+
 ## Key Files
 
 - `AGENTS.md`: product and repository working rules
@@ -240,6 +316,7 @@ cd android-client
 - `docs/PRODUCT_BRIEF.md`: product scope
 - `docs/DECISIONS.md`: architectural decisions
 - `docs/TODO.md`: current backlog
+- `docs/OPERATIONS_RUNBOOK.md`: production preflight, health, backup, verification and guarded restore procedure
 - `docs/ANDROID_APP_PLAN.md`: Android boundaries and QA checklist
 - `docs/ANDROID_QA_CHECKLIST.md`: repeatable emulator/physical-device QA and current results
 - `docs/ANDROID_PARENT_AUTH_DESIGN.md`: device-credential-first settings protection design and QA boundary
@@ -248,14 +325,19 @@ cd android-client
 - `components/app/app-shell.tsx`: child app UI and sync/cache behavior
 - `lib/app-access.ts`: app key and entitlement rules
 - `lib/app-catalog.ts`: approved catalog projection and stable catalog version
+- `lib/lite-catalog.ts`: explicitly published public Lite catalog projection, ordering and ETag
+- `app/api/lite/catalog/route.ts`: public read-only Lite catalog endpoint
 - `lib/channels.ts`: family-scoped channel normalization, lookup and video-form resolution
 - `lib/app-policy.ts`: Wi-Fi requirement default and database policy read
 - `lib/app-fallback-catalog.ts`: ten non-playing layout/filter samples
 - `lib/app-sync.ts`: API request validation and sync policy
 - `lib/rate-limit.ts`: bounded process-local fixed-window limiter and hashed identifiers
 - `scripts/verify-web.mjs`: temporary-DB migration, type, lint, test and production-build verification
+- `scripts/check-production-env.mjs`: production secrets/configuration and persistent SQLite path preflight without printing values
+- `scripts/backup-restore.mjs`: maintenance-mode SQLite/upload backup, verification and guarded restore
 - `.github/workflows/web-ci.yml`: Node 22 web verification workflow
 - `.github/workflows/android-logic-ci.yml`: Java 17 policy smoke-test workflow
+- `.github/workflows/android-debug-apk.yml`: Android lint and debug-only APK artifact workflow
 - `android-client/app/src/main/java/com/sontube/client/MainActivity.java`: restricted WebView
 - `android-client/app/src/main/java/com/sontube/client/NavigationPolicy.java`: top-level URL policy
 - `android-client/app/src/main/java/com/sontube/client/WebViewLoadState.java`: main-frame error state
@@ -282,7 +364,12 @@ C:\codex\app\sontube
 상위 C:\codex\app 폴더와 형제 프로젝트는 읽거나 수정하지 마세요.
 기존 변경을 임의로 되돌리지 말고, 작업 전 pwd, git status, 주요 파일 구조를 확인해 주세요.
 
-현재 최우선 목표는 Android 실제 기기 QA입니다.
+현재 최우선 목표는 공개 웹 경계와 1차 운영 배포 준비를 검증한 뒤 Android 실제 기기 QA를 완료하는 것입니다.
+- `/` 부모 브로슈어와 `/lite` 공개 목록 경계
+- Lite 명시 공개 조건, 빈 상태, 검색·필터·재생과 로컬 내 목록
+- `ADMIN_ALLOWED_EMAILS` 두 계정과 Cloudflare Access 경로 분리
+- 현재 Next/SQLite/업로드에 맞는 영구 디스크 Node 배포와 백업·복구
+- Cloudflare Pages+SonTube 전용 Supabase 전환은 후속 단계로 유지
 - debug APK 설치
 - 앱 키 등록과 승인 카탈로그 동기화
 - 접속·복귀마다 카탈로그 버전 확인과 변경 목록 수신
@@ -305,18 +392,18 @@ YouTube Data API, Google API Key, 전체 검색, 댓글/자막 수집, 영상 �
 - 기존 전역 영상·태그·앱 키는 bootstrap 가족에 귀속했으며 로컬 DB orphan 수는 모두 0으로 확인했다.
 - 부모 결제 경로는 `/admin/payment`, 최종관리자 경로는 `/superadmin/login`이다.
 - 최종관리자는 사용자·가족, 요금제, 입금 신청, 환불, 감사 로그를 관리하고 보호자 계정으로 30분 대체 로그인할 수 있다.
-- 대체 로그인은 비밀번호 재확인과 사유를 요구하며 결제·환불·계정 보안 작업을 차단한다.
+- 대체 로그인은 비밀번호 재확인과 사유를 요구하며 보호자 화면의 모든 데이터 변경을 차단한다.
 - 결제는 활성 상품의 서버 가격·기간을 스냅샷으로 저장하고, 승인 트랜잭션이 `FamilySubscription`, `SubscriptionGrant`, 앱 키 `paidUntil`, 감사 로그를 함께 반영한다.
 - 환불은 부모 요청 후 운영자가 실제 송금을 완료한 다음 최종관리자 화면에서 기록한다. 현재 전액·최신 활성 지급 건만 지원한다.
 - 실제 사업자·계좌 값은 `PAYMENT_*` 비밀 환경변수에만 둔다. 상품 seed는 0원·비활성이고 최종관리자 화면에서 가격 설정 후 활성화한다.
-- 마이그레이션은 `20260702000000_baseline`, `20260730090000_add_family_manual_payment`, `20260730120000_add_video_channels` 순서이며, 빈 DB 적용 후 현재 schema와 diff가 없음을 확인했다. 운영 가이드는 `docs/MANUAL_PAYMENT_OPERATION.md`다.
+- 현재 마이그레이션은 baseline, 가족·결제, 채널, Lite 카탈로그, 보호자 세션 버전의 5개 순서이며 빈 DB 적용을 검증했다. 운영 가이드는 `docs/MANUAL_PAYMENT_OPERATION.md`다.
 - Android 네이티브 설치 ID를 영속 저장하고 `/api/app/policy?installationId=...`로 가족별 Wi-Fi 정책을 조회한다. 등록 성공 시 동일 설치 ID의 이전 앱 키 바인딩은 해제된다.
 
-### Local Database Migration Record
+### Historical Local Database Migration Record (2026-07-30)
 
 - 결제 적용 전 백업: `prisma/dev.before-payment-20260730.db` (gitignored)
 - 채널 적용 전 백업: `prisma/dev.before-channel-20260730.db` (gitignored)
-- 적용 migrations: `20260702000000_baseline`, `20260730090000_add_family_manual_payment`, `20260730120000_add_video_channels`
+- 당시 적용 migrations: `20260702000000_baseline`, `20260730090000_add_family_manual_payment`, `20260730120000_add_video_channels`; 이후 2개 migration은 배포 전 별도 적용 필요
 - seed 후 검증: Family 1, ParentUser 1, Video orphan 0, Tag orphan 0, AppAccessKey orphan 0, PaymentPlan 2
 - `npx prisma migrate status`: schema up to date
 
@@ -328,10 +415,10 @@ YouTube Data API, Google API Key, 전체 검색, 댓글/자막 수집, 영상 �
 - 앱 카탈로그는 nullable 채널 정보를 전달하며, 같은 채널 보기는 현재 가족의 승인·공개 영상만 `channelId`로 로컬 필터링한다.
 - 외부 YouTube 채널 이동, 채널 영상 자동 수집, YouTube Data API 또는 Google API Key 사용은 없다.
 - migration `20260730120000_add_video_channels` 적용 후 기존 Video 1편이 채널 미지정으로 보존됨을 확인했다.
-- 전체 Vitest 18 files/75 tests와 Next.js production build 통과를 확인했다.
+- 당시 전체 Vitest 18 files/75 tests와 Next.js production build 통과를 확인했다. 현재 검증 수치는 위 `Last Verified`를 따른다.
 - 임시 QA DB 브라우저 검증에서 이름 변경, 신규 선택 비활성화, 등록 폼의 비활성 채널 제외, 영상 이동·원본 삭제 병합과 병합 성공 문구를 확인했고 브라우저 오류는 0건이었다. 임시 DB와 서버는 정리했다.
 
-### Remaining Priority
+### Historical Remaining Priority (superseded by `Next Work Order` above)
 
 1. 실제 기기 Android QA를 완료한다.
 2. 공개 운영 전 실제 `PAYMENT_*`와 별도 `SUPERADMIN_*` 비밀값을 배포 환경에 설정한다.

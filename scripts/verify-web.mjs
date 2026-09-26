@@ -24,6 +24,9 @@ const environment = {
   SESSION_SECRET:
     process.env.SESSION_SECRET ??
     "ci-only-parent-session-secret-do-not-use-in-production",
+  ADMIN_ALLOWED_EMAILS:
+    process.env.ADMIN_ALLOWED_EMAILS ??
+    "ci-parent@example.com,ci-partner@example.com",
   SUPERADMIN_LOGIN_ID: process.env.SUPERADMIN_LOGIN_ID ?? "ci-owner",
   SUPERADMIN_SESSION_SECRET:
     process.env.SUPERADMIN_SESSION_SECRET ??

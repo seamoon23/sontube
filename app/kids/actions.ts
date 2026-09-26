@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { isKidsSignalType } from "@/lib/kids-signals";
 import { getAppAccessState, hashAppAccessKey, normalizeAppAccessKey } from "@/lib/app-access";
 import { requireAdminSession } from "@/lib/admin-session";
+import { isAdminMutationBlocked } from "@/lib/admin-mutation-guard";
 
 export type KidsSignalActionInput = {
   videoId: string;
@@ -95,5 +96,6 @@ async function resolveSignalFamilyId(input: KidsSignalActionInput): Promise<stri
   }
 
   const session = await requireAdminSession();
+  if (isAdminMutationBlocked(session)) return null;
   return session.familyId;
 }

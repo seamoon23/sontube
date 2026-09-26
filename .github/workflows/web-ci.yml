@@ -2,7 +2,13 @@ name: Web CI
 
 on:
   push:
+    paths-ignore:
+      - "android-client/**"
+      - "scripts/verify-android-logic.mjs"
   pull_request:
+    paths-ignore:
+      - "android-client/**"
+      - "scripts/verify-android-logic.mjs"
   workflow_dispatch:
 
 permissions:
@@ -21,6 +27,7 @@ jobs:
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
       SESSION_SECRET: ci-only-parent-session-secret-do-not-use-in-production
+      ADMIN_ALLOWED_EMAILS: ci-parent@example.com,ci-partner@example.com
       SUPERADMIN_LOGIN_ID: ci-owner
       SUPERADMIN_SESSION_SECRET: ci-only-superadmin-session-secret-do-not-use-in-production
     steps:

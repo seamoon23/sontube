@@ -13,7 +13,7 @@ export default function AdminLayout({ children }: Readonly<{ children: React.Rea
   }
 
   return (
-    <div id="admin-shell" className="min-h-screen bg-slate-50">
+    <div id="admin-shell" className="min-h-[100dvh] bg-slate-50">
       <a
         href="#admin-main"
         className="fixed left-4 top-4 z-[60] -translate-y-24 rounded-md bg-white px-4 py-3 font-semibold text-ink shadow-lg focus:translate-y-0"

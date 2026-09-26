@@ -34,7 +34,7 @@ export default async function AdminDashboardPage() {
           <h2 className="text-2xl font-bold text-ink">오늘의 관리 상태</h2>
           <p className="mt-1 text-sm text-slate-600">{session.displayName}님 계정으로 관리 중입니다.</p>
         </div>
-        <Link href="/admin/videos/new" className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
+        <Link href="/admin/videos/new" className="inline-flex min-h-11 items-center rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
           영상 등록
         </Link>
       </div>
@@ -58,7 +58,7 @@ export default async function AdminDashboardPage() {
               : "입금 신청과 처리 상태를 결제 안내에서 확인할 수 있습니다."}
           </p>
         </div>
-        <Link href="/admin/payment" className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-ocean hover:text-ocean">
+        <Link href="/admin/payment" className="inline-flex min-h-11 items-center rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-ocean hover:text-ocean">
           이용권·결제 보기
         </Link>
       </section>
@@ -73,14 +73,17 @@ export default async function AdminDashboardPage() {
           </p>
         </div>
         <label className="flex items-start gap-3 rounded-md bg-slate-50 p-4 text-sm text-slate-700">
-          <input type="checkbox" name="wifiRequired" defaultChecked={family.wifiRequired} className="mt-1 h-4 w-4 rounded border-slate-300 text-ocean focus:ring-ocean" />
+          <input type="checkbox" name="wifiRequired" defaultChecked={family.wifiRequired} disabled={Boolean(session.impersonatedBy)} className="mt-1 h-4 w-4 rounded border-slate-300 text-ocean focus:ring-ocean disabled:cursor-not-allowed disabled:opacity-50" />
           <span>
             <strong className="block text-ink">Wi-Fi 연결 필수</strong>
             끄면 Wi-Fi와 모바일 데이터 모두에서 새 승인 목록을 받을 수 있습니다.
           </span>
         </label>
         <div>
-          <button type="submit" className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">정책 저장</button>
+          <button type="submit" disabled={Boolean(session.impersonatedBy)} className="min-h-11 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300">정책 저장</button>
+          {session.impersonatedBy ? (
+            <p className="mt-2 text-xs font-semibold text-purple-800">대체 로그인에서는 정책을 변경할 수 없습니다.</p>
+          ) : null}
         </div>
       </form>
 

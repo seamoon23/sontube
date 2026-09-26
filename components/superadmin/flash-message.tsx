@@ -10,6 +10,8 @@ export function FlashMessage({
   return (
     <div
       role={error ? "alert" : "status"}
+      aria-live={error ? "assertive" : "polite"}
+      aria-atomic="true"
       className={`rounded-xl border px-4 py-3 text-sm font-semibold leading-6 ${
         error
           ? "border-red-200 bg-red-50 text-red-800"

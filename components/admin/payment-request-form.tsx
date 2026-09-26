@@ -37,7 +37,11 @@ export function PaymentRequestForm({
   }
 
   return (
-    <form action={submit} className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <form
+      action={submit}
+      aria-busy={isPending}
+      className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+    >
       <div>
         <p className="text-xs font-bold text-ocean">입금 완료 신청</p>
         <h2 className="mt-1 text-lg font-bold text-ink">입금 정보를 알려주세요</h2>
@@ -45,7 +49,7 @@ export function PaymentRequestForm({
       </div>
       <label className="grid gap-2 text-sm font-semibold text-slate-700">
         이용권
-        <select name="planId" required disabled={disabled || isPending} className="rounded-md border border-slate-300 px-3 py-3 text-sm">
+        <select name="planId" required disabled={disabled || isPending} className="min-h-11 rounded-md border border-slate-300 px-3 py-3 text-sm">
           <option value="">선택해 주세요</option>
           {plans.map((plan) => (
             <option key={plan.id} value={plan.id}>{plan.name} · {formatKrw(plan.priceKrw)} · {plan.durationDays}일</option>
@@ -55,11 +59,11 @@ export function PaymentRequestForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-semibold text-slate-700">
           입금자명
-          <input name="depositorName" maxLength={40} required disabled={disabled || isPending} placeholder="통장에 표시되는 이름" className="rounded-md border border-slate-300 px-3 py-3 text-sm" />
+          <input name="depositorName" maxLength={40} required disabled={disabled || isPending} placeholder="통장에 표시되는 이름" className="min-h-11 rounded-md border border-slate-300 px-3 py-3 text-sm" />
         </label>
         <label className="grid gap-2 text-sm font-semibold text-slate-700">
           입금일 또는 예정일
-          <input name="expectedDepositDate" type="date" required disabled={disabled || isPending} className="rounded-md border border-slate-300 px-3 py-3 text-sm" />
+          <input name="expectedDepositDate" type="date" required disabled={disabled || isPending} className="min-h-11 rounded-md border border-slate-300 px-3 py-3 text-sm" />
         </label>
       </div>
       <label className="grid gap-2 text-sm font-semibold text-slate-700">
@@ -67,11 +71,11 @@ export function PaymentRequestForm({
         <textarea name="userMemo" maxLength={1000} rows={3} disabled={disabled || isPending} className="rounded-md border border-slate-300 px-3 py-3 text-sm" />
       </label>
       {result && (
-        <p role="status" className={`rounded-md border px-4 py-3 text-sm font-semibold ${result.ok ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-800"}`}>
+        <p role={result.ok ? "status" : "alert"} aria-live={result.ok ? "polite" : "assertive"} aria-atomic="true" className={`rounded-md border px-4 py-3 text-sm font-semibold ${result.ok ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-800"}`}>
           {result.message}
         </p>
       )}
-      <button type="submit" disabled={disabled || isPending || plans.length === 0} className="rounded-md bg-ink px-4 py-3 text-sm font-bold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
+      <button type="submit" disabled={disabled || isPending || plans.length === 0} className="min-h-11 rounded-md bg-ink px-4 py-3 text-sm font-bold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
         {isPending ? "접수 중" : "입금 확인 요청"}
       </button>
     </form>
@@ -93,15 +97,15 @@ export function PaymentRefundForm({ paymentRequestId }: { paymentRequestId: stri
   }
 
   return (
-    <form action={submit} className="grid gap-2 border-t border-slate-100 pt-3">
+    <form action={submit} aria-busy={isPending} className="grid gap-2 border-t border-slate-100 pt-3">
       <label className="grid gap-1 text-xs font-semibold text-slate-600">
         환불 사유 (선택)
-        <input name="reason" maxLength={1000} className="rounded-md border border-slate-300 px-3 py-2 text-sm" />
+        <input name="reason" maxLength={1000} className="min-h-11 rounded-md border border-slate-300 px-3 py-2 text-sm" />
       </label>
-      <button type="submit" disabled={isPending} className="justify-self-start rounded-md border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 hover:border-red-300 hover:text-red-700 disabled:opacity-50">
+      <button type="submit" disabled={isPending} className="min-h-11 justify-self-start rounded-md border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 hover:border-red-300 hover:text-red-700 disabled:opacity-50">
         {isPending ? "요청 중" : "전액 환불 요청"}
       </button>
-      {result && <p role="status" className={`text-xs font-semibold ${result.ok ? "text-green-700" : "text-red-700"}`}>{result.message}</p>}
+      {result && <p role={result.ok ? "status" : "alert"} aria-live={result.ok ? "polite" : "assertive"} aria-atomic="true" className={`text-xs font-semibold ${result.ok ? "text-green-700" : "text-red-700"}`}>{result.message}</p>}
     </form>
   );
 }

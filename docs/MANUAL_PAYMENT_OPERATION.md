@@ -20,6 +20,7 @@ SonTube 초기 유료 운영은 PG나 자동결제 없이 `선불 이용권 선�
 ### 보호자 bootstrap
 
 - `SESSION_SECRET`
+- `ADMIN_ALLOWED_EMAILS` (서로 다른 운영 보호자 이메일 정확히 두 개)
 - `ADMIN_PASSWORD_HASH`
 - `PARENT_BOOTSTRAP_EMAIL`
 - `PARENT_BOOTSTRAP_FAMILY_NAME`
@@ -61,7 +62,7 @@ npm run auth:hash -- <보호자비밀번호> <SESSION_SECRET>
 npm run auth:hash -- <최종관리자비밀번호> <SUPERADMIN_SESSION_SECRET>
 ```
 
-3. `.env`에 위 환경변수를 넣는다. 이 파일은 커밋하지 않는다.
+3. `.env`에 위 환경변수를 넣고 `ADMIN_ALLOWED_EMAILS`의 두 이메일 중 하나를 `PARENT_BOOTSTRAP_EMAIL`로 지정한다. 이 파일은 커밋하지 않는다.
 4. DB를 준비하고 bootstrap 가족과 비활성 기본 상품을 만든다.
 
 ```powershell
@@ -72,7 +73,7 @@ npm run db:seed
 5. 브라우저에서 `/superadmin/login`으로 들어가 `최종관리자 > 요금제`에서 가격을 입력하고 상품을 활성화한다. 시드 상품은 사고 방지를 위해 처음에는 `0원/비활성`이다.
 6. `/admin/login`에서 bootstrap 보호자 이메일로 로그인해 `보호자 관리자 > 이용권·결제` 안내를 확인한다.
 
-기존 마이그레이션 이력이 없는 DB를 업그레이드할 때는 DB, `public/uploads/thumbnails`, 환경변수를 같은 시점에 백업한 뒤 스테이징에서 먼저 검증한다. 기존 스키마가 이미 있는 DB는 baseline만 적용된 것으로 기록한 뒤 업그레이드를 실행한다.
+기존 마이그레이션 이력이 없는 DB를 업그레이드할 때는 앱 쓰기를 중지하고 `npm run ops:backup`과 `npm run ops:backup:verify`로 DB·`public/uploads/thumbnails`를 같은 시점에 백업한 뒤 스테이징에서 먼저 복구한다. 환경변수는 archive에 포함되지 않으므로 호스팅 secrets에서 별도로 암호화 보관한다. 상세 명령과 복구 순서는 `docs/OPERATIONS_RUNBOOK.md`를 따른다. 기존 스키마가 이미 있는 DB는 baseline만 적용된 것으로 기록한 뒤 업그레이드를 실행한다.
 
 ```powershell
 npx prisma migrate resolve --applied 20260702000000_baseline
@@ -80,7 +81,13 @@ npx prisma migrate deploy
 npm run db:seed
 ```
 
-빈 DB에서는 `npx prisma migrate deploy`가 baseline과 가족·결제 업그레이드를 순서대로 모두 적용한다. 이 순서는 빈 임시 SQLite DB에 실제 적용한 뒤 현재 `schema.prisma`와 차이가 없음을 검증했다.
+빈 DB에서는 `npx prisma migrate deploy`가 baseline, 가족·결제, 채널, Lite 공개와 보호자 세션 버전 migration을 순서대로 모두 적용한다. 현재 순서는 아래와 같고, 빈 임시 SQLite DB에 실제 적용한 뒤 현재 `schema.prisma`와 차이가 없음을 검증한다.
+
+1. `20260702000000_baseline`
+2. `20260730090000_add_family_manual_payment`
+3. `20260730120000_add_video_channels`
+4. `20260830090000_add_lite_catalog`
+5. `20260830120000_add_parent_user_session_version`
 
 ## 상품과 신청 규칙
 
@@ -128,8 +135,10 @@ npm run db:seed
 - 최종관리자 세션: 4시간
 - 대체 로그인: 최종관리자 비밀번호 재확인과 5자 이상의 사유 필수, 30분
 - 대체 로그인 중: 지속 배너 표시
-- 차단 작업: 결제 신청, 환불 요청, 계정 보안 변경
+- 차단 작업: 영상·Lite 공개·태그·채널·앱 키·통신 정책·결제를 포함한 모든 데이터 변경
 - 시작·종료: `SuperAdminAuditLog`에 기록
+
+보호자 세션에는 DB의 `sessionVersion`을 서명해 넣는다. 비밀번호 재설정, 보호자 활성 상태 또는 가족 활성 상태 변경 시 버전을 증가시켜 기존 세션을 즉시 폐기한다.
 
 대체 로그인은 화면과 재현 절차 확인용이다. 부모가 입력한 비밀번호나 앱 키 원문은 볼 수 없다.
 

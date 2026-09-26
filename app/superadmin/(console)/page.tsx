@@ -71,25 +71,31 @@ export default async function SuperAdminDashboardPage({ searchParams }: Dashboar
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
             <div>
-              <h3 className="text-lg font-black text-slate-950">최근 입금 신청</h3>
+              <h3 id="recent-payments-title" className="text-lg font-black text-slate-950">최근 입금 신청</h3>
               <p className="mt-1 text-sm text-slate-500">최근 신청 6건</p>
             </div>
-            <Link href="/superadmin/payments" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-700 hover:border-teal-600 hover:text-teal-800">
+            <Link href="/superadmin/payments" className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-700 hover:border-teal-600 hover:text-teal-800">
               전체 보기
             </Link>
           </div>
           {recentPayments.length === 0 ? (
             <EmptyState text="아직 입금 신청이 없습니다." />
           ) : (
-            <div className="overflow-x-auto">
+            <div
+              role="region"
+              aria-labelledby="recent-payments-title"
+              tabIndex={0}
+              className="overflow-x-auto focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-600"
+            >
               <table className="w-full min-w-[680px] text-left text-sm">
+                <caption className="sr-only">최근 입금 신청 6건</caption>
                 <thead className="bg-slate-50 text-xs font-bold text-slate-500">
                   <tr>
-                    <th className="px-5 py-3">신청번호</th>
-                    <th className="px-4 py-3">가족</th>
-                    <th className="px-4 py-3">금액</th>
-                    <th className="px-4 py-3">상태</th>
-                    <th className="px-5 py-3 text-right">접수</th>
+                    <th scope="col" className="px-5 py-3">신청번호</th>
+                    <th scope="col" className="px-4 py-3">가족</th>
+                    <th scope="col" className="px-4 py-3">금액</th>
+                    <th scope="col" className="px-4 py-3">상태</th>
+                    <th scope="col" className="px-5 py-3 text-right">접수</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -101,8 +107,8 @@ export default async function SuperAdminDashboardPage({ searchParams }: Dashboar
                         </Link>
                       </td>
                       <td className="px-4 py-4">
-                        <p className="font-bold text-slate-900">{payment.family.name}</p>
-                        <p className="mt-1 text-xs text-slate-500">{payment.requestedBy.displayName}</p>
+                        <p className="break-words font-bold text-slate-900">{payment.family.name}</p>
+                        <p className="mt-1 break-words text-xs text-slate-500">{payment.requestedBy.displayName}</p>
                       </td>
                       <td className="px-4 py-4 font-mono font-bold text-slate-800">{formatKrw(payment.amountKrw)}</td>
                       <td className="px-4 py-4"><PaymentStatusBadge status={payment.status} /></td>
@@ -118,7 +124,7 @@ export default async function SuperAdminDashboardPage({ searchParams }: Dashboar
         <section className="rounded-xl border border-slate-200 bg-white p-5">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-lg font-black text-slate-950">최근 관리자 작업</h3>
-            <Link href="/superadmin/audit" className="text-sm font-bold text-teal-800 hover:underline">전체 보기</Link>
+            <Link href="/superadmin/audit" className="inline-flex min-h-11 items-center text-sm font-bold text-teal-800 hover:underline">전체 보기</Link>
           </div>
           {recentAudits.length === 0 ? (
             <p className="mt-6 text-sm text-slate-500">기록된 작업이 없습니다.</p>
@@ -127,7 +133,7 @@ export default async function SuperAdminDashboardPage({ searchParams }: Dashboar
               {recentAudits.map((audit) => (
                 <li key={audit.id} className="grid gap-1 border-l-2 border-teal-200 pl-3">
                   <p className="text-sm font-bold text-slate-900">{formatAuditAction(audit.action)}</p>
-                  <p className="text-xs text-slate-500">{audit.actorId} / {formatDateTime(audit.createdAt)}</p>
+                  <p className="break-all text-xs text-slate-500">{audit.actorId} / {formatDateTime(audit.createdAt)}</p>
                 </li>
               ))}
             </ol>
