@@ -58,12 +58,21 @@ export default async function SuperAdminPaymentsPage({ searchParams }: PaymentsP
     <div className="grid gap-6">
       <FlashMessage notice={params.notice} error={params.error} />
 
-      <div>
-        <p className="text-sm font-extrabold text-teal-700">입금 신청</p>
-        <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950 md:text-3xl">수동 입금 확인과 환불 처리</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          신청 금액과 실제 입금액이 일치할 때만 승인됩니다. 승인과 환불은 이용기간과 감사 기록에 함께 반영됩니다.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-extrabold text-teal-700">입금 신청</p>
+          <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950 md:text-3xl">수동 입금 확인과 환불 처리</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            신청 금액과 실제 입금액이 일치할 때만 승인됩니다. 승인과 환불은 이용기간과 감사 기록에 함께 반영됩니다.
+          </p>
+        </div>
+        <a
+          href="/api/superadmin/payments/export"
+          download
+          className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-800 hover:border-teal-600 hover:text-teal-800"
+        >
+          전체 CSV 내려받기
+        </a>
       </div>
 
       <nav aria-label="입금 신청 상태" className="overflow-x-auto rounded-xl border border-slate-200 bg-white p-2">

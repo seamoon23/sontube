@@ -36,6 +36,7 @@ The child experience must not expose a general browser, address bar, administrat
 - Copyable, statistics-based prompt for analysis in an external AI tool
 - Mobile-friendly navigation, skip link and menu-specific slide guides
 - Administrator-only bottom sponsor/ad placeholder
+- Final-administrator-only payment and refund reconciliation CSV export without free-form memos or internal IDs
 - Bounded process-local rate limiting for parent/superadmin login and payment/refund requests
 - `nosniff`, same-origin framing, referrer and restricted browser-capability response headers
 - Search indexing and shared caching disabled for administrator, child and protected API route families; the explicit Lite API is the public exception
@@ -264,12 +265,13 @@ cd android-client
 
 - Fresh temporary SQLite database: all 5 migrations applied; Prisma generate and validate passed
 - TypeScript and ESLint: passed
-- Vitest: 34 files, 156 tests passed
+- Vitest: 35 files, 159 tests passed
 - Next.js production build: passed
 - Generated `/robots.txt`, Lite crawl/noindex exception and protected-route no-store configuration tests: passed
 - Lite JSON Schema against the actual 200 response, weak ETag 304 and 503 no-store tests: passed
 - Lite browser QA with a temporary six-item public catalog at 320 px, 390 px and 1440 px: no horizontal page overflow; search/filter/channel/empty-state/local playlist, real YouTube iframe load, viewport-sized full-screen focus and close recovery passed
 - Operational environment preflight and generic no-store DB health route tests: passed
+- Authenticated payment/refund CSV export, no-store response and spreadsheet-formula neutralization tests: passed
 - SQLite VACUUM snapshot, thumbnail checksum manifest, tamper detection, overwrite refusal and force-restore rollback tests: passed
 - Independent Android debug-only APK workflow structure and local `lintDebug assembleDebug`: passed
 - Java `NavigationPolicySmokeTest`: passed
