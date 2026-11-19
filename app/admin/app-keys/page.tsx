@@ -24,9 +24,6 @@ export default async function AdminAppKeysPage() {
       status: state.status,
       statusLabel: state.label,
       canSync: state.canSync,
-      trialStartedAt: key.trialStartedAt.toISOString(),
-      trialEndsAt: key.trialEndsAt.toISOString(),
-      paidUntil: key.paidUntil?.toISOString() ?? null,
       lastSyncedAt: key.lastSyncedAt?.toISOString() ?? null,
       createdAt: key.createdAt.toISOString(),
     };

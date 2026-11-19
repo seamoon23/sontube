@@ -152,6 +152,8 @@ function summarizeMetadata(value: string | null): string | null {
       typeof parsed.email === "string" ? `이메일: ${parsed.email}` : null,
       typeof parsed.code === "string" ? `코드: ${parsed.code}` : null,
       typeof parsed.expiresAt === "string" ? `만료: ${parsed.expiresAt}` : null,
+      typeof parsed.previousLimit === "number" && typeof parsed.videoLimit === "number" ? `영상 한도: ${parsed.previousLimit} → ${parsed.videoLimit}개` : null,
+      typeof parsed.published === "boolean" ? `Lite 공개: ${parsed.published ? "승인" : "해제"}` : null,
     ].filter(Boolean).join(" / ") || "상세 값 기록됨";
   } catch {
     return "상세 값 형식 오류";
@@ -161,6 +163,8 @@ function summarizeMetadata(value: string | null): string | null {
 function formatAdminAction(action: string): string {
   const labels: Record<string, string> = {
     FAMILY_CREATED: "가족과 대표 보호자 생성",
+    FAMILY_VIDEO_LIMIT_UPDATED: "가족 무료 영상 한도 변경",
+    LITE_PUBLICATION_UPDATED: "Lite 공개 승인 변경",
     FAMILY_ACTIVATED: "가족 활성화",
     FAMILY_DEACTIVATED: "가족 비활성화",
     PARENT_USER_CREATED: "보호자 계정 추가",

@@ -29,6 +29,7 @@ import {
   verifySuperAdminCredentials,
 } from "@/lib/superadmin-auth";
 import { requireSuperAdminSession } from "@/lib/superadmin-session";
+import { DEFAULT_FAMILY_VIDEO_LIMIT, MAX_FAMILY_VIDEO_LIMIT } from "@/lib/family-limits";
 import {
   createHashedRateLimitIdentifier,
   getMvpTrustedProxyClientIp,
@@ -274,6 +275,35 @@ export async function toggleFamilyActiveAction(formData: FormData): Promise<void
   revalidatePath("/superadmin");
   revalidatePath("/superadmin/users");
   redirectWithFlash(returnPath, "notice", nextActive ? "가족을 활성화했습니다." : "가족을 비활성화했습니다.");
+}
+
+export async function updateFamilyVideoLimitAction(formData: FormData): Promise<void> {
+  const session = await requireSuperAdminSession();
+  const returnPath = getReturnPath(formData, "/superadmin/users");
+  try {
+    const familyId = readIdentifier(formData, "familyId", "가족");
+    const videoLimit = readInteger(formData, "videoLimit", "영상 한도", DEFAULT_FAMILY_VIDEO_LIMIT, MAX_FAMILY_VIDEO_LIMIT);
+    const reason = readRequiredText(formData, "reason", "변경 사유", 500, 5);
+    await prisma.$transaction(async (tx) => {
+      const family = await tx.family.findUniqueOrThrow({ where: { id: familyId } });
+      await tx.family.update({ where: { id: familyId }, data: { videoLimit } });
+      await tx.superAdminAuditLog.create({
+        data: {
+          action: "FAMILY_VIDEO_LIMIT_UPDATED",
+          actorId: session.loginId,
+          targetFamilyId: familyId,
+          metadataJson: JSON.stringify({ previousLimit: family.videoLimit, videoLimit, reason }),
+        },
+      });
+    });
+  } catch (error) {
+    redirectWithFlash(returnPath, "error", getActionErrorMessage(error, "가족 영상 한도를 변경하지 못했습니다."));
+  }
+  revalidatePath("/superadmin/users");
+  revalidatePath("/superadmin/audit");
+  revalidatePath("/admin");
+  revalidatePath("/admin/videos/new");
+  redirectWithFlash(returnPath, "notice", "무료 영상 한도를 변경했습니다. 기존 영상은 삭제되지 않습니다.");
 }
 
 export async function toggleParentUserActiveAction(formData: FormData): Promise<void> {

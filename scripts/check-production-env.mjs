@@ -1,16 +1,9 @@
 const REQUIRED_ENV_NAMES = [
   "DATABASE_URL",
   "SESSION_SECRET",
-  "ADMIN_ALLOWED_EMAILS",
   "SUPERADMIN_LOGIN_ID",
   "SUPERADMIN_PASSWORD_HASH",
   "SUPERADMIN_SESSION_SECRET",
-  "PAYMENT_BUSINESS_NAME",
-  "PAYMENT_BUSINESS_NUMBER",
-  "PAYMENT_BANK_NAME",
-  "PAYMENT_ACCOUNT_NUMBER",
-  "PAYMENT_ACCOUNT_HOLDER",
-  "PAYMENT_SUPPORT_CONTACT",
 ];
 
 const PLACEHOLDER_FRAGMENTS = [
@@ -122,6 +115,9 @@ function inspectAllowedEmails(raw, issues) {
   if (!raw) {
     return;
   }
+  if (looksLikePlaceholder(raw)) {
+    issues.push(error("ADMIN_ALLOWED_EMAILS", "still looks like a placeholder"));
+  }
 
   const emails = raw
     .split(",")
@@ -159,15 +155,11 @@ function inspectBootstrapEnvironment(env, issues) {
   inspectHash("ADMIN_PASSWORD_HASH", passwordHash, issues);
 
   if (bootstrapEmail) {
-    const allowedEmails = clean(env.ADMIN_ALLOWED_EMAILS)
-      .split(",")
-      .map((value) => value.trim().toLowerCase());
-
-    if (!EMAIL_PATTERN.test(bootstrapEmail) || !allowedEmails.includes(bootstrapEmail)) {
+    if (!EMAIL_PATTERN.test(bootstrapEmail)) {
       issues.push(
         error(
           "PARENT_BOOTSTRAP_EMAIL",
-          "must be valid and included in ADMIN_ALLOWED_EMAILS",
+          "must be a valid email",
         ),
       );
     }

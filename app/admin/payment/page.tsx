@@ -1,4 +1,4 @@
-import { PaymentRefundForm, PaymentRequestForm } from "@/components/admin/payment-request-form";
+import { PaymentRefundForm } from "@/components/admin/payment-request-form";
 import { requireAdminSession } from "@/lib/admin-session";
 import { prisma } from "@/lib/db";
 import { getManualPaymentStatusLabel, type ManualPaymentStatus } from "@/lib/manual-payment";
@@ -9,100 +9,23 @@ export const dynamic = "force-dynamic";
 export default async function AdminPaymentPage() {
   const session = await requireAdminSession();
   const config = getManualPaymentConfig();
-  const [plans, requests, subscription] = await Promise.all([
-    prisma.paymentPlan.findMany({
-      where: { isActive: true },
-      orderBy: [{ displayOrder: "asc" }, { priceKrw: "asc" }],
-    }),
-    prisma.paymentRequest.findMany({
-      where: { familyId: session.familyId },
-      include: { grant: true, refunds: { orderBy: { requestedAt: "desc" } } },
-      orderBy: { requestedAt: "desc" },
-      take: 50,
-    }),
-    prisma.familySubscription.findUnique({ where: { familyId: session.familyId } }),
-  ]);
+  const requests = await prisma.paymentRequest.findMany({
+    where: { familyId: session.familyId },
+    include: { grant: true, refunds: { orderBy: { requestedAt: "desc" } } },
+    orderBy: { requestedAt: "desc" },
+    take: 50,
+  });
   const isImpersonating = Boolean(session.impersonatedBy);
-  const canApply = config.isConfigured && !isImpersonating;
 
   return (
     <div className="grid gap-6">
-      <div>
-        <p className="text-sm font-semibold text-ocean">이용권·결제</p>
-        <h2 className="text-2xl font-bold text-ink">계좌이체 이용권</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          SonTube는 현재 선불 계좌이체로 운영합니다. 자동결제와 자동갱신은 없으며, 입금 확인 후 운영자가 직접 이용권을 활성화합니다.
-        </p>
-      </div>
-
-      {isImpersonating && (
-        <div className="rounded-lg border border-purple-300 bg-purple-50 p-4 text-sm font-semibold text-purple-900">
-          최종관리자 대체 로그인 중에는 결제 신청, 환불 요청과 계정 보안 변경을 할 수 없습니다.
-        </div>
-      )}
-
-      <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-[1fr_auto] md:items-center">
-        <div>
-          <p className="text-xs font-bold text-ocean">현재 이용 상태</p>
-          <h2 className="mt-1 text-xl font-bold text-ink">{getSubscriptionLabel(subscription)}</h2>
-          {subscription && (
-            <p className="mt-1 text-sm text-slate-600">{formatDate(subscription.startsAt)} ~ {formatDate(subscription.expiresAt)}</p>
-          )}
-        </div>
-        <span className="rounded-md bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">자동갱신 없음</span>
+      <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-5">
+        <h2 className="text-2xl font-bold text-ink">무료 이용 안내</h2>
+        <p className="text-sm leading-6 text-slate-600">SonTube는 개인 개발자가 운영하는 가족용 영상 관리 앱입니다. 기본 한도는 가족당 영상 20개이며 운영자가 무료로 승인한 가족은 한도가 다를 수 있습니다.</p>
+        <p className="text-sm leading-6 text-slate-600">기간 제한이나 결제는 없습니다. 한도에 도달해도 기존 영상은 계속 관리하고 시청할 수 있습니다. 현재 한도와 등록 수는 대시보드에서 확인하세요.</p>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2">
-        {plans.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600 md:col-span-2">
-            현재 신청 가능한 이용권이 없습니다. 운영자가 가격과 상품을 준비한 뒤 표시됩니다.
-          </div>
-        ) : (
-          plans.map((plan) => (
-            <article key={plan.id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="break-all text-xs font-bold text-ocean">{plan.code}</p>
-              <h2 className="mt-1 break-words text-xl font-bold text-ink">{plan.name}</h2>
-              <p className="mt-2 text-3xl font-black text-ink">{formatKrw(plan.priceKrw)}</p>
-              <p className="mt-1 text-sm font-semibold text-slate-600">{plan.durationDays}일 · 입금 확인 후 시작</p>
-              {plan.description && <p className="mt-3 text-sm leading-6 text-slate-600">{plan.description}</p>}
-              <p className="mt-3 text-xs text-slate-500">활성 이용권이 있으면 현재 만료일 다음 날부터 이어서 연장됩니다.</p>
-            </article>
-          ))
-        )}
-      </section>
-
-      <section className="grid gap-4 rounded-lg border border-slate-200 bg-sky-50 p-5 shadow-sm">
-        <div>
-          <p className="text-xs font-bold text-ocean">입금 계좌</p>
-          <h2 className="mt-1 text-lg font-bold text-ink">신청 정보와 같은 입금자명으로 보내주세요</h2>
-        </div>
-        {config.isConfigured ? (
-          <dl className="grid gap-3 rounded-md bg-white p-4 text-sm sm:grid-cols-2">
-            <Info label="은행" value={config.bankName} />
-            <Info label="계좌번호" value={config.accountNumber} />
-            <Info label="예금주" value={config.accountHolder} />
-            <Info label="사업자" value={`${config.businessName} · ${config.businessNumber}`} />
-          </dl>
-        ) : (
-          <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
-            계좌이체 안내를 준비 중입니다. 계좌정보가 설정되기 전에는 입금 확인 요청을 받지 않습니다.
-          </div>
-        )}
-        <p className="text-sm leading-6 text-slate-700">{config.confirmationNotice}</p>
-        <p className="text-sm leading-6 text-slate-700">문의: {config.supportContact || "준비 중"}</p>
-      </section>
-
-      <PaymentRequestForm
-        plans={plans.map((plan) => ({
-          id: plan.id,
-          name: plan.name,
-          description: plan.description,
-          priceKrw: plan.priceKrw,
-          durationDays: plan.durationDays,
-        }))}
-        disabled={!canApply}
-      />
-
+      {requests.length > 0 && <>
       <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div>
           <p className="text-xs font-bold text-ocean">결제 내역</p>
@@ -150,19 +73,13 @@ export default async function AdminPaymentPage() {
         <p>현금영수증이 필요하면 신청번호와 함께 고객지원으로 문의해 주세요. 휴대전화번호나 사업자번호 같은 발급정보는 이 화면에서 수집하지 않습니다.</p>
         <p>실제 송금 전에 상태를 환불 완료로 바꾸지 않으며, 처리 결과는 위 결제 내역에 표시됩니다.</p>
       </section>
+      </>}
     </div>
   );
 }
 
 function Info({ label, value }: { label: string; value: string }) {
   return <div><dt className="text-xs font-bold text-slate-500">{label}</dt><dd className="mt-1 break-words font-semibold text-slate-800">{value}</dd></div>;
-}
-
-function getSubscriptionLabel(subscription: { status: string; expiresAt: Date } | null): string {
-  if (!subscription) return "활성 이용권 없음";
-  if (subscription.status === "ACTIVE" && subscription.expiresAt > new Date()) return `${formatDate(subscription.expiresAt)}까지 이용 가능`;
-  if (subscription.status === "SUSPENDED") return "이용 일시 중지";
-  return "이용 기간 종료";
 }
 
 function formatKrw(value: number): string {

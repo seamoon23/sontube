@@ -13,12 +13,9 @@ export type ManagedAppAccessKey = {
   name: string;
   keyPrefix: string;
   isActive: boolean;
-  status: "disabled" | "trial" | "paid" | "expired";
+  status: "disabled" | "free";
   statusLabel: string;
   canSync: boolean;
-  trialStartedAt: string;
-  trialEndsAt: string;
-  paidUntil: string | null;
   lastSyncedAt: string | null;
   createdAt: string;
 };
@@ -80,7 +77,7 @@ export function AppKeyManager({ keys }: { keys: ManagedAppAccessKey[] }) {
           <p className="text-sm font-semibold text-ocean">앱 연결</p>
           <h2 className="text-xl font-bold text-ink">가족 앱 키 만들기</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            이 키를 앱 설정에 등록하면 승인된 영상 카탈로그가 앱으로 동기화됩니다. 무료 체험은 키 생성 시점부터 14일입니다.
+            이 키를 앱 설정에 등록하면 승인된 영상 카탈로그가 앱으로 동기화됩니다. 기간 제한 없이 무료로 사용할 수 있습니다.
           </p>
         </div>
         <form action={submitCreate} className="grid gap-3 md:grid-cols-[1fr_auto]">
@@ -166,8 +163,7 @@ export function AppKeyManager({ keys }: { keys: ManagedAppAccessKey[] }) {
               </div>
               <p className="break-all font-mono text-xs text-slate-500">prefix: {key.keyPrefix}...</p>
               <dl className="grid gap-2 text-sm text-slate-600 md:grid-cols-3">
-                <Info label="체험 종료" value={formatDate(key.trialEndsAt)} />
-                <Info label="유료 이용" value={key.paidUntil ? formatDate(key.paidUntil) : "미적용"} />
+                <Info label="생성일" value={formatDate(key.createdAt)} />
                 <Info label="최근 동기화" value={key.lastSyncedAt ? formatDateTime(key.lastSyncedAt) : "아직 없음"} />
               </dl>
             </div>
@@ -208,12 +204,8 @@ function getStatusClassName(status: ManagedAppAccessKey["status"]): string {
   switch (status) {
     case "disabled":
       return "bg-slate-100 text-slate-600";
-    case "trial":
-      return "bg-sky-100 text-sky-800";
-    case "paid":
+    case "free":
       return "bg-green-100 text-green-800";
-    case "expired":
-      return "bg-amber-100 text-amber-800";
   }
 }
 

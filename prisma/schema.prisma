@@ -83,6 +83,8 @@ enum PaymentAuditAction {
 model Family {
   id              String              @id @default(cuid())
   name            String
+  videoLimit      Int                 @default(20)
+  catalogRevision Int                 @default(0)
   wifiRequired    Boolean             @default(true)
   isActive        Boolean             @default(true)
   createdAt       DateTime            @default(now())

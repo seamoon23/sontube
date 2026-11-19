@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createHash } from "node:crypto";
 import {
   getAppAccessState,
   getNextRecommendedSyncAt,
@@ -85,65 +86,71 @@ export async function buildAppSyncResult(
     };
   }
 
-  const accessKey = await prisma.appAccessKey.findUnique({
-    where: { keyHash: hashAppAccessKey(key) },
-    include: { family: { select: { isActive: true, wifiRequired: true } } },
-  });
+  // One snapshot prevents a new revision from being paired with an older catalog or binding.
+  return prisma.$transaction(async (tx): Promise<AppSyncResult> => {
+    const accessKey = await tx.appAccessKey.findUnique({
+      where: { keyHash: hashAppAccessKey(key) },
+      include: { family: { select: { isActive: true, wifiRequired: true, catalogRevision: true } } },
+    });
 
-  if (!accessKey) {
-    return {
-      ok: false,
-      status: 401,
-      message: "등록되지 않은 앱 키입니다.",
-    };
-  }
+    if (!accessKey) {
+      return {
+        ok: false,
+        status: 401,
+        message: "등록되지 않은 앱 키입니다.",
+      };
+    }
 
-  if (!accessKey.familyId || !accessKey.family?.isActive) {
-    return {
-      ok: false,
-      status: 403,
-      message: "사용할 수 없는 가족 앱 키입니다.",
-    };
-  }
+    if (!accessKey.familyId || !accessKey.family?.isActive) {
+      return {
+        ok: false,
+        status: 403,
+        message: "사용할 수 없는 가족 앱 키입니다.",
+      };
+    }
 
-  const binding = validateInstallationBinding({
-    mode: options.mode,
-    currentInstallationId: accessKey.installationId,
-    requestedInstallationId: parsed.data.installationId,
-  });
+    const binding = validateInstallationBinding({
+      mode: options.mode,
+      currentInstallationId: accessKey.installationId,
+      requestedInstallationId: parsed.data.installationId,
+    });
 
-  if (!binding.ok) {
-    return binding;
-  }
+    if (!binding.ok) {
+      return binding;
+    }
 
-  const accessState = getAppAccessState(accessKey, now);
-  const policy: AppPolicy = { wifiRequired: accessKey.family.wifiRequired };
+    const accessState = getAppAccessState(accessKey);
+    const policy: AppPolicy = { wifiRequired: accessKey.family.wifiRequired };
 
-  if (!accessState.canSync) {
-    return {
-      ok: true,
-      message: accessState.status === "expired" ? "이용 기간이 종료되었습니다." : "비활성화된 앱 키입니다.",
-      access: toAppSyncAccess(accessKey, accessState, accessKey.lastSyncedAt, now),
-      policy,
-      catalog: buildAppCatalog([], now),
-    };
-  }
+    if (!accessState.canSync) {
+      return {
+        ok: false,
+        status: 403,
+        message: "비활성화된 앱 키입니다.",
+      };
+    }
 
-  const videos = await prisma.video.findMany({
-    where: { ...APP_CATALOG_VIDEO_WHERE, familyId: accessKey.familyId },
-    include: {
-      channel: { select: { id: true, displayName: true } },
-      tags: {
-        where: { tag: { familyId: accessKey.familyId, isActive: true } },
-        include: { tag: true },
-        orderBy: { tag: { sortOrder: "asc" } },
-      },
-    },
-    orderBy: [{ isParentRecommended: "desc" }, { parentRecommendedAt: "desc" }, { updatedAt: "desc" }],
-  });
-  const catalog = buildAppCatalog(videos, now);
+    const version = createHash("sha256")
+      .update(`family-catalog-v1:${accessKey.familyId}:${accessKey.family.catalogRevision}`)
+      .digest("hex").slice(0, 24);
+    const catalogIsCurrent = options.mode === "sync" && !parsed.data.force && parsed.data.catalogVersion === version;
+    let catalog: AppCatalog | null = null;
+    if (!catalogIsCurrent) {
+      const videos = await tx.video.findMany({
+        where: { ...APP_CATALOG_VIDEO_WHERE, familyId: accessKey.familyId },
+        include: {
+          channel: { select: { id: true, displayName: true } },
+          tags: {
+            where: { tag: { familyId: accessKey.familyId, isActive: true } },
+            include: { tag: true },
+            orderBy: [{ tag: { sortOrder: "asc" } }, { tagId: "asc" }],
+          },
+        },
+        orderBy: [{ isParentRecommended: "desc" }, { parentRecommendedAt: "desc" }, { updatedAt: "desc" }, { id: "asc" }],
+      });
+      catalog = { ...buildAppCatalog(videos, now), version };
+    }
 
-  const updatedAccessKey = await prisma.$transaction(async (tx) => {
     if (binding.shouldBindInstallation) {
       await tx.appAccessKey.updateMany({
         where: {
@@ -154,30 +161,31 @@ export async function buildAppSyncResult(
       });
     }
 
-    return tx.appAccessKey.update({
-      where: { id: accessKey.id },
-      data: {
-        installationId: binding.shouldBindInstallation ? parsed.data.installationId : accessKey.installationId,
-        registeredAt: binding.shouldBindInstallation ? now : accessKey.registeredAt,
-        lastSyncedAt: now,
-      },
-    });
+    // Avoid a DB write for repeated focus events; the response still records this successful check.
+    if (binding.shouldBindInstallation || !accessKey.lastSyncedAt || now.getTime() - accessKey.lastSyncedAt.getTime() >= 300_000) {
+      await tx.appAccessKey.update({
+        where: { id: accessKey.id },
+        data: {
+          installationId: binding.shouldBindInstallation ? parsed.data.installationId : accessKey.installationId,
+          registeredAt: binding.shouldBindInstallation ? now : accessKey.registeredAt,
+          lastSyncedAt: now,
+        },
+      });
+    }
+
+    return {
+      ok: true,
+      message:
+        options.mode === "register"
+          ? "앱 키를 등록하고 콘텐츠를 동기화했습니다."
+          : catalogIsCurrent
+            ? "승인 목록이 최신입니다."
+            : "새 승인 목록을 동기화했습니다.",
+      access: toAppSyncAccess(accessKey, accessState, now, now),
+      policy,
+      catalog,
+    };
   });
-
-  const catalogIsCurrent = options.mode === "sync" && parsed.data.catalogVersion === catalog.version;
-
-  return {
-    ok: true,
-    message:
-      options.mode === "register"
-        ? "앱 키를 등록하고 콘텐츠를 동기화했습니다."
-        : catalogIsCurrent
-          ? "승인 목록이 최신입니다."
-          : "새 승인 목록을 동기화했습니다.",
-    access: toAppSyncAccess(updatedAccessKey, accessState, now, now),
-    policy,
-    catalog: catalogIsCurrent ? null : catalog,
-  };
 }
 
 function validateInstallationBinding({
@@ -215,8 +223,6 @@ function validateInstallationBinding({
 function toAppSyncAccess(
   accessKey: {
     keyPrefix: string;
-    trialEndsAt: Date;
-    paidUntil: Date | null;
   },
   state: AppAccessState,
   lastSyncedAt: Date | null,

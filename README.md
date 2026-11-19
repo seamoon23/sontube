@@ -6,7 +6,7 @@ SonTube는 부모가 PC·모바일 웹에서 안전 영상을 관리하고, 아�
 
 - `/`: 부모가 서비스 목적과 사용 흐름을 확인하는 공개 소개 화면
 - `/lite`: 운영자가 명시적으로 Lite 공개한 안전 승인 영상만 사용하는 읽기 전용 공용 체험
-- `/admin`: `ADMIN_ALLOWED_EMAILS`에 등록된 운영 보호자 두 계정만 사용하는 관리 화면
+- `/admin`: 활성 보호자가 자기 가족의 영상만 관리하는 화면 (계정은 최종관리자가 생성)
 - `/superadmin`: 별도 `SUPERADMIN_*` 자격 증명을 가진 소유자 한 명의 운영 화면
 - `/app`: 앱 키·설치 ID와 가족 정책을 사용하는 Android 제한형 클라이언트 화면
 - `/api/health`: DB 읽기 가능 여부만 200/503으로 반환하는 no-store 운영 헬스체크
@@ -40,7 +40,7 @@ npm run auth:hash -- <superadmin-password> <SUPERADMIN_SESSION_SECRET>
 
 첫 해시는 `.env`의 `ADMIN_PASSWORD_HASH`, 두 번째 해시는 `SUPERADMIN_PASSWORD_HASH`에 넣습니다. 보호자 이메일은 `PARENT_BOOTSTRAP_EMAIL`, 최종관리자 ID는 `SUPERADMIN_LOGIN_ID`로 설정합니다.
 
-`.env`의 `ADMIN_ALLOWED_EMAILS`에는 실제 운영 보호자 이메일 두 개만 쉼표로 구분해 넣습니다. bootstrap 이메일도 이 목록에 있어야 합니다. 첫 계정을 seed한 뒤 두 번째 계정은 브라우저에서 `최종관리자 > 사용자`(`/superadmin/users`)로 이동해 만들고, 두 이메일 모두 활성 `ParentUser`인지 확인합니다. 실제 이메일이나 비밀번호는 저장소·문서·채팅에 기록하지 않습니다.
+`.env`의 `ADMIN_ALLOWED_EMAILS`는 선택 설정으로, 공용 Lite 공개를 허용할 운영자 두 이메일만 지정합니다. 비워두면 Lite 공개를 변경할 수 없지만 활성 보호자 로그인은 가능합니다. 일반 가족·보호자는 브라우저에서 `최종관리자 로그인 > 사용자·가족`(`/superadmin/users`)으로 이동해 생성합니다. 실제 이메일이나 비밀번호는 저장소·문서·채팅에 기록하지 않습니다.
 
 4. SQLite DB와 Prisma Client를 준비합니다.
 
@@ -90,7 +90,7 @@ npm run dev:lan
 - 채널 관리 화면의 이름 변경, 신규 선택 비활성화, 중복 채널 병합과 채널별 영상 바로가기
 - 가족별 보호자 이메일 로그인과 서버 액션 보호
 - Family 기준 영상·태그·앱 키·아이 반응 데이터 격리
-- 사업자 계좌이체 안내, 입금 신청과 부모 결제 내역
+- 무료 가족 한도 안내와 과거 결제·환불 내역 보존 (신규 결제 차단)
 - 최종관리자 전용 로그인, 사용자·상품·입금·환불·감사 로그 관리
 - 멱등 입금 승인, 이용권 생성·연장과 전액 환불 회수
 - 사유·재인증·30분 제한이 있는 보호자 대체 로그인
@@ -120,7 +120,7 @@ npm run dev:lan
 - 외부 AI 도구에 붙여넣을 수 있는 통계 기반 프롬프트 생성
 - 등록된 영상만 YouTube iframe으로 재생
 - PWA manifest 기본 설정
-- 앱 키 기반 14일 체험, 설치 ID 바인딩, 승인 카탈로그 JSON 동기화
+- 기간 제한 없는 무료 앱 키, 설치 ID 바인딩, 가족 변경 번호 기반 승인 카탈로그 JSON 동기화
 - Android WebView 설치형 클라이언트와 정확한 `/app` 최상위 경로 제한
 - 외부 URL, 관리자 화면, 새 창, 다운로드, 파일 접근 차단
 - WebView 탐색 기록 미복원, 뒤로가기 목적지와 History API 주소 재검사
@@ -218,7 +218,7 @@ GitHub에서 debug APK를 수동 생성할 때는 `SonTube 저장소 > Actions >
 - 앱 키는 최초 등록된 설치 ID에 바인딩되며, 다른 앱에서 재사용하려면 새 키를 만들어야 합니다.
 - 저장된 키는 앱 설정에서 평문으로 다시 표시하지 않습니다.
 - 앱은 시작하거나 다시 전면으로 돌아올 때마다 저장된 카탈로그 버전을 확인하고, 버전이 달라진 경우에만 새 승인 목록을 받습니다.
-- 무료 체험은 앱 키 생성일부터 14일이며 이용 상태 카드는 부모 관리자 화면에서만 표시합니다.
+- 기간 제한 없이 가족당 전체 영상 20개까지 무료입니다. `최종관리자 > 사용자·가족 > 무료 영상 등록 한도`에서 결제 없이 한도를 확대할 수 있습니다. 기존 체험·결제 날짜는 접근 권한에 영향을 주지 않습니다.
 - 관리자 접근 경로 `관리자 화면 > 대시보드 > 앱 접속 정책`에서 목록 수신 환경을 `Wi-Fi만` 또는 `Wi-Fi + 모바일 데이터`로 정합니다.
 - 앱이 통신 정책을 확인하지 못하면 `Wi-Fi 필수=true`로 처리하고 실제 목록 대신 재생되지 않는 샘플 화면을 표시합니다.
 
@@ -242,23 +242,22 @@ Cloudflare 계정과 `jjunybox.com` DNS 존만 다른 서비스와 공유합니�
 
 시작 위치는 Cloudflare Dashboard의 `Zero Trust > Access controls > Applications`입니다. `Create new application > Self-hosted and private > Add public hostname`으로 이동합니다. 공식 경로 설명은 [Cloudflare self-hosted application 문서](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/)와 [Application paths 문서](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/app-paths/)를 함께 확인합니다.
 
-1. `SonTube Admin` 애플리케이션을 만들고 운영 도메인의 `/admin`, `/admin/*`, `/api/admin`, `/api/admin/*`, `/kids`, `/kids/*`를 등록합니다. `Allow` 정책의 `Include > Emails`에는 `ADMIN_ALLOWED_EMAILS`와 같은 두 이메일만 넣습니다.
+1. `SonTube Admin` 애플리케이션을 만들고 운영 도메인의 `/admin`, `/admin/*`, `/api/admin`, `/api/admin/*`, `/kids`, `/kids/*`를 등록합니다. `Allow` 정책의 `Include > Emails`에는 초대한 실제 보호자들을 포함해야 합니다. 기존 두 이메일만 허용하는 정책은 일반 가족을 차단합니다. `ADMIN_ALLOWED_EMAILS`는 Lite 공개 운영자 설정이지 이 접근 목록이 아닙니다.
 2. `SonTube Superadmin` 애플리케이션을 별도로 만들고 `/superadmin`, `/superadmin/*`를 등록합니다. `Allow` 정책에는 소유자 이메일 하나만 넣습니다.
 3. 호스트 전체를 보호하는 광범위한 Access 애플리케이션은 만들지 않습니다. `/`, `/lite`, `/api/lite/*`, `/app`, `/api/app/*`는 Access 로그인 없이 열려야 합니다. 특히 Android 시작 정책과 앱 키 API 앞에 이메일 로그인을 두면 앱이 구동되지 않습니다.
 4. 경로 와일드카드는 부모 경로 자체를 포함하지 않으므로 `admin`과 `admin/*`처럼 두 경로를 모두 등록합니다. 더 구체적인 경로 정책이 우선 적용되므로 저장 후 각 URL을 직접 확인합니다.
 5. 시크릿 창에서 공개 경로는 로그인 없이 열리고, 관리자 경로는 등록된 이메일만 통과하며, 최종관리자 경로는 소유자만 통과하는지 확인합니다. Cloudflare Access를 통과해도 SonTube 자체 로그인은 계속 요구되어야 합니다.
 6. 원본 서버 주소나 대체 배포 도메인으로 Access를 우회할 수 없는지 확인합니다. 공개 원본이 남아 있으면 Cloudflare Tunnel의 Access 보호 또는 원본의 Access 토큰 검증을 추가합니다.
 
-## 광고/결제 방향
+## 무료 운영과 과거 결제 기록
 
 - 아이가 사용하는 `/app` 화면에는 광고를 넣지 않습니다.
 - YouTube iframe 자체 광고는 YouTube 플레이어 정책에 따라 노출될 수 있으며 SonTube가 차단하거나 변조하지 않습니다.
-- 초기 유료 운영은 PG·카드·인앱결제 없이 사업용 계좌이체와 최종관리자 수동 승인으로 진행합니다.
-- 상품은 90일·365일 선불 이용권이며 자동결제와 자동갱신이 없습니다.
-- 계좌·사업자 정보는 `PAYMENT_*` 운영 환경변수에만 저장합니다.
-- 보호자는 `관리자 > 이용권·결제`, 운영자는 `최종관리자 > 결제`에서 상태를 확인합니다.
-- 실제 공개 판매 전 사업자등록, 통신판매업 신고 여부, 환불·현금영수증과 세무 정책을 확인해야 합니다.
-- 설정과 운영 절차는 `docs/MANUAL_PAYMENT_OPERATION.md`를 따릅니다.
+- 가족당 전체 영상 20개가 기본이며 최종관리자만 사유·감사 로그와 함께 무료 한도를 변경합니다. 한도 축소나 기존 초과 데이터는 삭제하지 않습니다.
+- 신규 결제는 서버에서 차단합니다. 부모 화면의 계좌·상품·입금 신청은 제거하고 과거 내역·환불만 보존합니다. `PAYMENT_*`는 무료 운영 필수 설정이 아닙니다.
+- 보호자는 `관리자 > 대시보드`에서 사용량을, `무료 이용 안내`에서 정책과 과거 내역을 확인합니다.
+- 배포 전 백업 후 프로젝트 루트 `C:\codex\app\sontube`에서 `npm run db:migrate`를 실행하고 재시작해야 합니다. SQLite 한도·카탈로그 트리거를 설치하므로 `db:push`로 대체하지 않습니다.
+- 현재 운영 정책은 `docs/DECISIONS.md`의 D040·D041을 따릅니다. 향후 유료화는 별도 정책·사업자 검토 대상입니다.
 ## 추가 문서
 
 - `android-client/README.md`: Android Studio 실행, 서버 주소, APK 빌드 경로

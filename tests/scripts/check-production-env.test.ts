@@ -6,6 +6,12 @@ const scriptPath = resolve(process.cwd(), "scripts/check-production-env.mjs");
 const sensitiveMarker = "do-not-print-this-secret-marker";
 
 describe("production environment preflight", () => {
+  it("allows free operation without payment settings or Lite operators", () => {
+    const env = validEnvironment();
+    delete env.ADMIN_ALLOWED_EMAILS;
+    for (const name of Object.keys(env)) if (name.startsWith("PAYMENT_")) delete env[name];
+    expect(runPreflight(env).status).toBe(0);
+  });
   it("passes a production configuration without printing values", () => {
     const result = runPreflight(validEnvironment());
 

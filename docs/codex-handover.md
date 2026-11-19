@@ -1,6 +1,23 @@
 # SonTube Codex Handover
 
-Updated: 2026-09-26
+Updated: 2026-11-19
+
+## Current Free-Family Release (supersedes older payment/allowlist instructions below)
+
+- Free operation: 20 total video records per family by default, including hidden/unreviewed videos. Only the environment-authenticated superadmin changes `Family.videoLimit` (20–100,000) with a reason and transactional audit. No automatic deletion or playback restriction when a family exceeds a lowered cap.
+- No 14-day expiration. Active keys work regardless of historical trial/payment dates; disabled families, parents, keys and mismatched installations remain blocked.
+- Parent logins now use active DB accounts and families, not the two-email allowlist. Accounts are provisioned via `Superadmin > 사용자·가족`; public self-registration is not implemented.
+- `ADMIN_ALLOWED_EMAILS` optionally identifies exactly two Lite-publishing operators. Normal parents cannot publish to the common Lite catalog. Their edits withdraw existing video publication; public-linked tag/channel edits require an operator. Lite publication writes are audited, and support impersonation remains read-only.
+- `/admin/payment` now explains free limits and shows historical records/refund tools only when records exist. The new-payment action always refuses requests. Historical payment service/data and owner reconciliation remain intact and cannot increase video quotas. `PAYMENT_*` settings are no longer required for free production preflight.
+- SQLite triggers enforce insertion/move quotas and increment a family catalog revision on video, catalog tag/channel metadata and tag-link mutations. Unchanged sync does not query video/tag tables. One transaction covers credentials, revision/catalog and binding. The app checks every 5 minutes while visible, backs off to 30 minutes after failure and fails closed on rejected credentials.
+- Deploy the sixth migration `20261119000000_free_family_limits` before starting this version. Use `npm run db:migrate`, never `db:push`, to preserve the required triggers. Existing records above 20 are preserved but cannot add more until the owner raises their limit.
+- Existing Cloudflare Access rules that allow only two parent emails must be revisited before inviting more families. Never weaken the separate owner-only `/superadmin` policy. No cloud/DNS/account or production DB changes were made in this task.
+- PostgreSQL migration must reproduce both quota and catalog invalidation guarantees. Pagination, delta payloads and push are intentionally deferred.
+- Verification uses fresh temporary databases, not the user's local data. Windows sandbox default TEMP directory rename may return EPERM in the existing backup tests; a process-local TEMP/TMP under `prisma/.qa-temp` permits those tests without changing backup code.
+
+Start in the browser at `/superadmin/login`, then `사용자·가족 > 해당 가족 > 무료 영상 등록 한도` to grant a free increase. Parents see usage in `/admin > 대시보드` and the explanation in `무료 이용 안내`.
+
+Verified on 2026-11-19: all 6 migrations on a fresh temporary SQLite DB, Prisma generate/validate, TypeScript, ESLint, 36 Vitest files / 180 tests, Next.js production build and all 4 Android Java policy smoke tests passed. Integration tests also migrated a pre-existing 25-video family without deleting records, enforced competing inserts at 20, verified audited limit rollback, cross-family mutation rejection, indirect Lite metadata protection, expired-key free access, rejected/replacement key bindings, revision invalidation and unchanged-sync SQL omission. No physical-device/browser visual QA, production migration, commit or push was performed.
 
 ## Resume Point
 

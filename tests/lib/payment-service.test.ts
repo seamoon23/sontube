@@ -444,6 +444,8 @@ async function createTestSchema(client: PrismaClient): Promise<void> {
     `CREATE TABLE "Family" (
       "id" TEXT NOT NULL PRIMARY KEY,
       "name" TEXT NOT NULL,
+      "videoLimit" INTEGER NOT NULL DEFAULT 20,
+      "catalogRevision" INTEGER NOT NULL DEFAULT 0,
       "wifiRequired" BOOLEAN NOT NULL DEFAULT true,
       "isActive" BOOLEAN NOT NULL DEFAULT true,
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

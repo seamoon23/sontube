@@ -1,11 +1,17 @@
 import { VideoForm } from "@/components/admin/video-form";
 import { prisma } from "@/lib/db";
 import { requireAdminSession } from "@/lib/admin-session";
+import { canPublishLite } from "@/lib/admin-auth";
+import { getFamilyVideoUsage, videoLimitMessage } from "@/lib/family-limits";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewVideoPage() {
   const session = await requireAdminSession();
+  const usage = await getFamilyVideoUsage(prisma, session.familyId);
+  if (!usage.canCreate) {
+    return <section className="grid gap-3 rounded-lg border border-amber-200 bg-amber-50 p-5"><h2 className="text-xl font-bold">영상 등록 한도</h2><p>{videoLimitMessage(usage.limit)}</p><a href="/admin/videos" className="min-h-11 py-3 font-semibold underline">기존 영상 관리로 이동</a></section>;
+  }
 
   const [tags, existingVideos, channels] = await Promise.all([
     prisma.tag.findMany({
@@ -32,6 +38,7 @@ export default async function NewVideoPage() {
         <h2 className="text-2xl font-bold text-ink">새 영상</h2>
       </div>
       <VideoForm
+        canPublishLite={canPublishLite(session, process.env)}
         mode="create"
         tags={tags.map(serializeTag)}
         channels={channels}

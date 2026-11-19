@@ -7,6 +7,16 @@ function readProjectFile(path: string) {
 }
 
 describe("restricted app quality contracts", () => {
+  it("uses server-confirmed free access and hides rejected credentials without discarding a replacement key", () => {
+    const source = readProjectFile("components/app/app-shell.tsx");
+    expect(source).not.toContain("trialEndsAt");
+    expect(source).not.toContain("paidUntil");
+    expect(source).toContain('access.status === "free" && access.canSync');
+    expect(source).toContain("!options.replaceStoredKey || response.status >= 500");
+    expect(source).toContain("Math.min(delay * 2, 1_800_000)");
+    expect(source).toContain('document.visibilityState === "visible"');
+    expect(source).toContain("nextCatalog.videos.some((video) => video.id === current)");
+  });
   it("keeps startup and settings state usable on mobile and assistive technology", () => {
     const source = readProjectFile("components/app/app-shell.tsx");
 

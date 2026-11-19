@@ -1,22 +1,17 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
-export const APP_ACCESS_TRIAL_DAYS = 14;
-export const APP_ACCESS_SYNC_INTERVAL_HOURS = 24;
+export const APP_ACCESS_SYNC_INTERVAL_MINUTES = 5;
 
-export type AppAccessStatus = "disabled" | "trial" | "paid" | "expired";
+export type AppAccessStatus = "disabled" | "free";
 
 export type AppAccessRecord = {
   isActive: boolean;
-  trialEndsAt: Date;
-  paidUntil: Date | null;
 };
 
 export type AppAccessState = {
   status: AppAccessStatus;
   canSync: boolean;
   label: string;
-  trialEndsAt: string;
-  paidUntil: string | null;
 };
 
 export function createRawAppAccessKey(): string {
@@ -46,60 +41,15 @@ export function normalizeAppAccessKey(rawKey: string): string {
   return rawKey.trim();
 }
 
-export function buildAppAccessTrialWindow(start = new Date()): {
-  trialStartedAt: Date;
-  trialEndsAt: Date;
-} {
+export function getAppAccessState(record: AppAccessRecord): AppAccessState {
   return {
-    trialStartedAt: start,
-    trialEndsAt: addDays(start, APP_ACCESS_TRIAL_DAYS),
+    status: record.isActive ? "free" : "disabled",
+    canSync: record.isActive,
+    label: record.isActive ? "무료 이용" : "비활성",
   };
-}
-
-export function getAppAccessState(record: AppAccessRecord, now = new Date()): AppAccessState {
-  if (!record.isActive) {
-    return buildState("disabled", false, record);
-  }
-
-  if (record.paidUntil && record.paidUntil.getTime() > now.getTime()) {
-    return buildState("paid", true, record);
-  }
-
-  if (record.trialEndsAt.getTime() > now.getTime()) {
-    return buildState("trial", true, record);
-  }
-
-  return buildState("expired", false, record);
 }
 
 export function getNextRecommendedSyncAt(lastSyncedAt: Date | null, now = new Date()): string {
   const base = lastSyncedAt ?? now;
-  return new Date(base.getTime() + APP_ACCESS_SYNC_INTERVAL_HOURS * 60 * 60 * 1000).toISOString();
-}
-
-function buildState(status: AppAccessStatus, canSync: boolean, record: AppAccessRecord): AppAccessState {
-  return {
-    status,
-    canSync,
-    label: getStatusLabel(status),
-    trialEndsAt: record.trialEndsAt.toISOString(),
-    paidUntil: record.paidUntil?.toISOString() ?? null,
-  };
-}
-
-function getStatusLabel(status: AppAccessStatus): string {
-  switch (status) {
-    case "disabled":
-      return "비활성";
-    case "trial":
-      return "무료 체험";
-    case "paid":
-      return "이용 가능";
-    case "expired":
-      return "체험 종료";
-  }
-}
-
-function addDays(date: Date, days: number): Date {
-  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+  return new Date(base.getTime() + APP_ACCESS_SYNC_INTERVAL_MINUTES * 60 * 1000).toISOString();
 }

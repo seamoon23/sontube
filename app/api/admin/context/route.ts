@@ -3,7 +3,6 @@ import { cookies } from "next/headers";
 import {
   ADMIN_SESSION_COOKIE,
   isAdminAuthConfigured,
-  isAdminEmailAllowed,
   parseAdminSessionToken,
 } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
@@ -36,7 +35,7 @@ export async function GET() {
     select: { displayName: true, email: true },
   });
 
-  if (!user || (!session.impersonatedBy && !isAdminEmailAllowed(user.email, process.env))) {
+  if (!user) {
     return NextResponse.json({ ok: false }, { status: 401, headers: { "cache-control": "no-store" } });
   }
 

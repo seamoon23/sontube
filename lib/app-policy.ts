@@ -31,8 +31,8 @@ export async function getAppPolicyByInstallationId(installationId?: string | nul
 
   const accessKey = await prisma.appAccessKey.findUnique({
     where: { installationId: normalized },
-    select: { familyId: true },
+    select: { familyId: true, isActive: true },
   });
 
-  return getAppPolicy(accessKey?.familyId);
+  return getAppPolicy(accessKey?.isActive ? accessKey.familyId : null);
 }

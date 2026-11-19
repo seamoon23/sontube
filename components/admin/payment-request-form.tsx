@@ -27,10 +27,10 @@ export function PaymentRequestForm({
   const [result, setResult] = useState<PaymentActionResult | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function submit(formData: FormData) {
+  function submit() {
     setResult(null);
     startTransition(async () => {
-      const next = await createPaymentRequestAction(formData);
+      const next = await createPaymentRequestAction();
       setResult(next);
       if (next.ok) router.refresh();
     });

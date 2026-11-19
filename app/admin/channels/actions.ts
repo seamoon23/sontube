@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdminSession } from "@/lib/admin-session";
+import { canPublishLite } from "@/lib/admin-auth";
 import {
   IMPERSONATION_READ_ONLY_MESSAGE,
   isAdminMutationBlocked,
@@ -32,6 +33,11 @@ export async function renameChannelAction(
   });
   if (!channel) {
     return { ok: false, message: "수정할 채널을 찾을 수 없습니다." };
+  }
+  if (!canPublishLite(session, process.env) && await prisma.video.count({
+    where: { familyId: session.familyId, channelId, isLitePublished: true },
+  })) {
+    return { ok: false, message: "Lite 공개 영상에 사용 중인 채널은 운영자만 수정할 수 있습니다." };
   }
 
   const displayName = cleanChannelDisplayName(String(formData.get("displayName") ?? ""));
@@ -128,6 +134,12 @@ export async function mergeChannelAction(
   }
   if (!target.isActive) {
     return { ok: false, message: "사용 중인 채널만 병합 대상으로 선택할 수 있습니다." };
+  }
+
+  if (!canPublishLite(session, process.env) && await prisma.video.count({
+    where: { familyId: session.familyId, channelId: source.id, isLitePublished: true },
+  })) {
+    return { ok: false, message: "Lite 공개 영상에 사용 중인 채널은 운영자만 병합할 수 있습니다." };
   }
 
   const movedVideoCount = await prisma.video.count({

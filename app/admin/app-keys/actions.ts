@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import {
-  buildAppAccessTrialWindow,
   createRawAppAccessKey,
   hashAppAccessKey,
   makeAppKeyPrefix,
@@ -33,11 +32,7 @@ export async function createAppAccessKeyAction(formData: FormData): Promise<AppK
   }
 
   const rawKey = createRawAppAccessKey();
-  const trial = buildAppAccessTrialWindow();
-  const subscription = await prisma.familySubscription.findUnique({
-    where: { familyId: session.familyId },
-    select: { status: true, expiresAt: true },
-  });
+  const createdAt = new Date();
 
   await prisma.appAccessKey.create({
     data: {
@@ -45,12 +40,9 @@ export async function createAppAccessKeyAction(formData: FormData): Promise<AppK
       name: name || defaultKeyName(),
       keyHash: hashAppAccessKey(rawKey),
       keyPrefix: makeAppKeyPrefix(rawKey),
-      trialStartedAt: trial.trialStartedAt,
-      trialEndsAt: trial.trialEndsAt,
-      paidUntil:
-        subscription?.status === "ACTIVE" && subscription.expiresAt > new Date()
-          ? subscription.expiresAt
-          : null,
+      // Legacy required columns are retained for historical data, not access decisions.
+      trialStartedAt: createdAt,
+      trialEndsAt: createdAt,
     },
   });
 

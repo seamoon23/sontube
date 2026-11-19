@@ -77,6 +77,7 @@ import {
 } from "@/app/superadmin/actions";
 import {
   ADMIN_SESSION_COOKIE,
+  createAdminSessionToken,
   createImpersonatedAdminSessionToken,
   hashAdminPassword,
 } from "@/lib/admin-auth";
@@ -222,6 +223,31 @@ describe("admin session lifecycle actions", () => {
       where: { email: "outsider@example.com" },
       include: { family: { select: { isActive: true } } },
     });
+  });
+
+  it("authenticates an active family parent outside the Lite operator allowlist", async () => {
+    const identity = { id: "guest_1", familyId: "other_family", email: "family-parent@example.com", displayName: "보호자", sessionVersion: 1 };
+    mocks.parentFindUnique.mockResolvedValue({ ...identity, passwordHash: hashAdminPassword("correct-password", SESSION_SECRET), isActive: true, family: { isActive: true } });
+    const form = new FormData();
+    form.set("email", identity.email); form.set("password", "correct-password");
+    await expect(loginAdminAction(form)).rejects.toThrow("redirect:/admin");
+    mocks.state.parentToken = createAdminSessionToken(SESSION_SECRET, { ...identity, userId: identity.id });
+    mocks.parentFindFirst.mockResolvedValue(identity);
+    await expect(requireAdminSession()).resolves.toMatchObject({ familyId: "other_family" });
+    expect(mocks.parentFindFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: identity.id, familyId: identity.familyId, isActive: true, family: { is: { isActive: true } } }),
+    }));
+    expect((await getAdminContext()).status).toBe(200);
+  });
+
+  it("rejects inactive parents or families even with a correct password", async () => {
+    for (const [isActive, familyActive] of [[false, true], [true, false]]) {
+      const email = `inactive-${isActive}@example.com`;
+      mocks.parentFindUnique.mockResolvedValue({ id: "inactive", familyId: "family_1", email, passwordHash: hashAdminPassword("correct-password", SESSION_SECRET), isActive, family: { isActive: familyActive } });
+      const form = new FormData(); form.set("email", email); form.set("password", "correct-password");
+      expect(await loginAdminAction(form)).toMatchObject({ ok: false });
+    }
+    expect(mocks.cookieSet).not.toHaveBeenCalled();
   });
 
   it("rejects a signed cookie when the database session version has advanced", async () => {

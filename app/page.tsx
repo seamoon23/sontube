@@ -31,6 +31,7 @@ export default function HomePage() {
           <p className="text-sm font-black text-ocean">공개 체험은 Lite, 가족 목록은 Android</p>
           <h1 className="max-w-3xl break-keep text-balance text-4xl font-black leading-[1.12] tracking-tight text-ink md:text-5xl lg:text-6xl">유튜브 전체 대신, 골라 둔 영상만 보여주세요</h1>
           <p className="max-w-xl text-pretty text-base leading-7 text-slate-600 md:text-lg">Lite는 SonTube의 공용 목록을, Android 앱은 보호자가 승인한 가족 목록을 보여줍니다.</p>
+          <p className="max-w-xl text-sm leading-6 text-slate-600">개인 개발자가 운영하는 무료 서비스입니다. 가족 목록은 기본 20개까지 등록할 수 있으며, 운영자가 무료로 승인한 가족은 한도가 다를 수 있습니다. 현재 가족·보호자 계정은 운영자가 직접 등록합니다.</p>
           <div className="flex flex-wrap gap-3">
             <Link href="/lite" className="inline-flex min-h-11 items-center whitespace-nowrap rounded-md bg-ocean px-5 py-3 text-sm font-black text-white transition hover:bg-sky-800 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ocean focus-visible:ring-offset-2 motion-reduce:transform-none motion-reduce:transition-none">Lite 체험하기</Link>
             <Link href="#android-app" className="inline-flex min-h-11 items-center whitespace-nowrap rounded-md border border-slate-300 bg-white px-5 py-3 text-sm font-black text-slate-800 transition hover:border-ocean hover:text-ocean active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ocean focus-visible:ring-offset-2 motion-reduce:transform-none motion-reduce:transition-none">Android 앱 알아보기</Link>

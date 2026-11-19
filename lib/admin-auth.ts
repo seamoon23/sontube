@@ -27,7 +27,7 @@ export type AdminSessionPayload = AdminSessionIdentity & {
 };
 
 export function isAdminAuthConfigured(env: AdminAuthEnv): boolean {
-  return Boolean(env.SESSION_SECRET?.trim()) && getAdminAllowedEmails(env).length > 0;
+  return Boolean(env.SESSION_SECRET?.trim());
 }
 
 export function getAdminAllowedEmails(env: AdminAuthEnv): string[] {
@@ -48,6 +48,11 @@ export function getAdminAllowedEmails(env: AdminAuthEnv): string[] {
 export function isAdminEmailAllowed(email: string, env: AdminAuthEnv): boolean {
   const normalizedEmail = normalizeAdminEmail(email);
   return Boolean(normalizedEmail) && getAdminAllowedEmails(env).includes(normalizedEmail);
+}
+
+// The legacy allowlist now grants public Lite publishing, never family login or quota overrides.
+export function canPublishLite(session: { email: string; impersonatedBy?: string }, env: AdminAuthEnv): boolean {
+  return !session.impersonatedBy && isAdminEmailAllowed(session.email, env);
 }
 
 export function hashAdminPassword(password: string, secret: string): string {

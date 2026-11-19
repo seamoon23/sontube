@@ -6,7 +6,6 @@ import {
   ADMIN_SESSION_COOKIE,
   ADMIN_SESSION_MAX_AGE_SECONDS,
   createAdminSessionToken,
-  isAdminEmailAllowed,
   isAdminAuthConfigured,
   parseAdminSessionToken,
   verifyAdminPassword,
@@ -52,8 +51,6 @@ export async function loginAdminAction(formData: FormData): Promise<LoginResult>
     return { ok: false, message: "이메일 또는 비밀번호가 올바르지 않습니다." };
   }
 
-  const isAllowedEmail = isAdminEmailAllowed(email, process.env);
-
   const requestHeaders = await headers();
   const rateLimitKey = createHashedRateLimitIdentifier([
     getMvpTrustedProxyClientIp(requestHeaders),
@@ -77,7 +74,7 @@ export async function loginAdminAction(formData: FormData): Promise<LoginResult>
     process.env.SESSION_SECRET ?? "",
   );
   const isValid = Boolean(
-    isAllowedEmail && user?.isActive && user.family.isActive && passwordMatches,
+    user?.isActive && user.family.isActive && passwordMatches,
   );
 
   if (!isValid || !user) {

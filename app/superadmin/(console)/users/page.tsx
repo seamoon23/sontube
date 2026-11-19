@@ -8,6 +8,7 @@ import {
   startImpersonationAction,
   toggleFamilyActiveAction,
   toggleParentUserActiveAction,
+  updateFamilyVideoLimitAction,
 } from "@/app/superadmin/actions";
 import { prisma } from "@/lib/db";
 import { requireSuperAdminSession } from "@/lib/superadmin-session";
@@ -36,7 +37,6 @@ export default async function SuperAdminUsersPage({ searchParams }: UsersPagePro
     orderBy: { updatedAt: "desc" },
     include: {
       users: { orderBy: { createdAt: "asc" } },
-      subscription: true,
       _count: { select: { videos: true, appAccessKeys: true, paymentRequests: true } },
     },
   });
@@ -99,10 +99,6 @@ export default async function SuperAdminUsersPage({ searchParams }: UsersPagePro
           </div>
         ) : (
           families.map((family) => {
-            const subscriptionActive = Boolean(
-              family.subscription && family.subscription.status === "ACTIVE" && family.subscription.expiresAt > new Date(),
-            );
-
             return (
               <article key={family.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                 <div className="grid gap-4 border-b border-slate-200 p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
@@ -110,8 +106,8 @@ export default async function SuperAdminUsersPage({ searchParams }: UsersPagePro
                     <div className="flex flex-wrap items-center gap-2">
                       <h4 className="min-w-0 break-words text-xl font-black text-slate-950">{family.name}</h4>
                       <ActiveStatusBadge active={family.isActive} />
-                      <span className={`rounded-md border px-2 py-1 text-xs font-bold ${subscriptionActive ? "border-teal-200 bg-teal-50 text-teal-900" : "border-slate-300 bg-slate-100 text-slate-600"}`}>
-                        {subscriptionActive ? "이용권 활성" : "이용권 없음"}
+                      <span className="rounded-md border border-teal-200 bg-teal-50 px-2 py-1 text-xs font-bold text-teal-900">
+                        {family.videoLimit > 20 ? "무료 한도 확대 승인" : "무료 기본 한도"}
                       </span>
                     </div>
                     <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
@@ -121,8 +117,20 @@ export default async function SuperAdminUsersPage({ searchParams }: UsersPagePro
                       <Count label="결제 신청" value={family._count.paymentRequests} />
                     </dl>
                     <p className="mt-3 text-xs text-slate-500">
-                      이용권 만료: {family.subscription ? formatDateTime(family.subscription.expiresAt) : "없음"}
+                      영상 {family._count.videos} / {family.videoLimit}개 · 기간 제한 없음
                     </p>
+                    <form action={updateFamilyVideoLimitAction} className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <input type="hidden" name="familyId" value={family.id} />
+                      <input type="hidden" name="returnTo" value={returnTo} />
+                      <Field label="무료 영상 등록 한도">
+                        <input name="videoLimit" type="number" required min={20} max={100000} step={1} defaultValue={family.videoLimit} className={inputClass} />
+                      </Field>
+                      <Field label="승인·변경 사유">
+                        <input name="reason" required minLength={5} maxLength={500} className={inputClass} />
+                      </Field>
+                      <p className="text-xs leading-5 text-slate-500 sm:col-span-2">결제 없이 승인합니다. 한도를 줄여도 기존 영상은 유지되며 새 등록만 제한합니다. 변경은 감사 로그에 남습니다.</p>
+                      <SubmitButton label="무료 한도 승인·저장" pendingLabel="저장 중" className="sm:col-span-2" />
+                    </form>
                   </div>
                   <form action={toggleFamilyActiveAction}>
                     <input type="hidden" name="familyId" value={family.id} />

@@ -2,7 +2,6 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   ADMIN_SESSION_COOKIE,
-  isAdminEmailAllowed,
   isAdminAuthConfigured,
   parseAdminSessionToken,
   type AdminSessionPayload,
@@ -46,8 +45,7 @@ export async function requireAdminSession(): Promise<AdminSessionContext> {
 
   if (
     !user ||
-    user.sessionVersion !== session.sessionVersion ||
-    (!session.impersonatedBy && !isAdminEmailAllowed(user.email, process.env))
+    user.sessionVersion !== session.sessionVersion
   ) {
     redirect("/admin/login");
   }

@@ -1,5 +1,7 @@
 # SonTube Monetization Notes
 
+> 2026-11-19 이후 14일 체험과 유료 이용 제한을 폐기하고 가족당 20개 무료 운영으로 전환했습니다. 아래는 과거 검토 이력이며 현행 결정은 DECISIONS.md D040·D041입니다.
+
 ## Product Positioning
 
 The target buyer is the parent. The app is not positioned as a Kids Category app; it is a parent-managed family service with a restricted viewing client for children.

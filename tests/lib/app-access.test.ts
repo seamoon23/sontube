@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  APP_ACCESS_TRIAL_DAYS,
-  buildAppAccessTrialWindow,
   createRawAppAccessKey,
   getAppAccessState,
   hashAppAccessKey,
@@ -27,60 +25,13 @@ describe("app access keys", () => {
     expect(verifyAppAccessKeyHash("st_app_wrong_key_12345678901234567890", hash)).toBe(false);
   });
 
-  it("starts a 14 day free trial at key creation time", () => {
-    const start = new Date("2026-07-24T00:00:00.000Z");
-    const window = buildAppAccessTrialWindow(start);
-
-    expect(APP_ACCESS_TRIAL_DAYS).toBe(14);
-    expect(window.trialStartedAt).toEqual(start);
-    expect(window.trialEndsAt).toEqual(new Date("2026-08-07T00:00:00.000Z"));
-  });
-
-  it("computes disabled, trial, paid, and expired states", () => {
-    const now = new Date("2026-07-24T00:00:00.000Z");
-
-    expect(
-      getAppAccessState(
-        {
-          isActive: false,
-          trialEndsAt: new Date("2026-08-01T00:00:00.000Z"),
-          paidUntil: new Date("2026-08-24T00:00:00.000Z"),
-        },
-        now,
-      ),
-    ).toMatchObject({ status: "disabled", canSync: false });
-
-    expect(
-      getAppAccessState(
-        {
-          isActive: true,
-          trialEndsAt: new Date("2026-08-01T00:00:00.000Z"),
-          paidUntil: null,
-        },
-        now,
-      ),
-    ).toMatchObject({ status: "trial", canSync: true });
-
-    expect(
-      getAppAccessState(
-        {
-          isActive: true,
-          trialEndsAt: new Date("2026-07-01T00:00:00.000Z"),
-          paidUntil: new Date("2026-08-24T00:00:00.000Z"),
-        },
-        now,
-      ),
-    ).toMatchObject({ status: "paid", canSync: true });
-
-    expect(
-      getAppAccessState(
-        {
-          isActive: true,
-          trialEndsAt: new Date("2026-07-01T00:00:00.000Z"),
-          paidUntil: null,
-        },
-        now,
-      ),
-    ).toMatchObject({ status: "expired", canSync: false });
+  it("ignores historical trial and payment dates while preserving disabled keys", () => {
+    const expiredRecord = {
+      isActive: true,
+      trialEndsAt: new Date("2020-01-01"),
+      paidUntil: null,
+    };
+    expect(getAppAccessState(expiredRecord)).toEqual({ status: "free", canSync: true, label: "무료 이용" });
+    expect(getAppAccessState({ ...expiredRecord, isActive: false })).toMatchObject({ status: "disabled", canSync: false });
   });
 });

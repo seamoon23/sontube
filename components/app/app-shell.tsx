@@ -23,11 +23,9 @@ import {
 import { buildEmbedUrl } from "@/lib/youtube";
 
 type AppSyncAccess = {
-  status: "disabled" | "trial" | "paid" | "expired";
+  status: "disabled" | "free";
   canSync: boolean;
   label: string;
-  trialEndsAt: string;
-  paidUntil: string | null;
   keyPrefix: string;
   lastSyncedAt: string | null;
   nextRecommendedSyncAt: string;
@@ -142,9 +140,16 @@ export function AppShell() {
           const data = (await response.json()) as AppSyncResponse;
 
           if (!response.ok || !data.ok) {
-            if (response.status >= 500) setShowConnectionSamples(true);
+            if (!options.replaceStoredKey || response.status >= 500) setShowConnectionSamples(true);
             setMessageTone("error");
             setMessage(data.message || "동기화에 실패했습니다.");
+            return false;
+          }
+
+          if (!data.access.canSync) {
+            if (!options.replaceStoredKey) setShowConnectionSamples(true);
+            setMessageTone("error");
+            setMessage("사용할 수 없는 앱 키입니다.");
             return false;
           }
 
@@ -175,7 +180,9 @@ export function AppShell() {
           setSelectedChannelId((current) =>
             current && nextCatalog.videos.some((video) => video.channel?.id === current) ? current : null,
           );
-          setActiveVideoId((current) => current ?? nextCatalog.videos[0]?.id ?? null);
+          setActiveVideoId((current) =>
+            nextCatalog.videos.some((video) => video.id === current) ? current : nextCatalog.videos[0]?.id ?? null,
+          );
           setMessageTone("info");
           setMessage(data.message);
           return true;
@@ -240,6 +247,22 @@ export function AppShell() {
       document.removeEventListener("visibilitychange", checkOnReturn);
       window.removeEventListener("focus", checkOnReturn);
     };
+  }, [isReady, savedKey, syncWithKey]);
+
+  useEffect(() => {
+    if (!isReady || !savedKey) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    let delay = 300_000;
+    const check = async () => {
+      if (document.visibilityState === "visible") {
+        const ok = await syncWithKey(savedKey);
+        delay = ok ? 300_000 : Math.min(delay * 2, 1_800_000);
+      }
+      if (!cancelled) timer = setTimeout(check, delay);
+    };
+    timer = setTimeout(check, delay);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [isReady, savedKey, syncWithKey]);
 
   useEffect(() => {
@@ -915,17 +938,8 @@ function StatusInfo({ label, value }: { label: string; value: string }) {
 }
 
 function evaluateLocalAccess(access: AppSyncAccess): AppSyncAccess {
-  if (access.status === "disabled") return { ...access, canSync: false, label: "비활성" };
-
-  const now = Date.now();
-  const paidUntilMs = access.paidUntil ? new Date(access.paidUntil).getTime() : 0;
-  if (paidUntilMs > now) return { ...access, status: "paid", canSync: true, label: "이용 가능" };
-
-  if (new Date(access.trialEndsAt).getTime() > now) {
-    return { ...access, status: "trial", canSync: true, label: "이용 가능" };
-  }
-
-  return { ...access, status: "expired", canSync: false, label: "이용 종료" };
+  // Old cached entitlements are not upgraded locally; a successful server sync is required.
+  return { ...access, canSync: access.status === "free" && access.canSync };
 }
 
 function buildHotTags(videos: AppCatalogVideo[]): Array<{ slug: string; name: string; count: number }> {

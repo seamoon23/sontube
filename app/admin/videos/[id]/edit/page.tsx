@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { VideoForm, type VideoFormInitial } from "@/components/admin/video-form";
 import { prisma } from "@/lib/db";
 import { requireAdminSession } from "@/lib/admin-session";
+import { canPublishLite } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,7 @@ export default async function EditVideoPage({ params }: EditVideoPageProps) {
         <h2 className="text-2xl font-bold text-ink">{video.title}</h2>
       </div>
       <VideoForm
+        canPublishLite={canPublishLite(session, process.env)}
         mode="edit"
         initial={initial}
         tags={tags.map(serializeTag)}

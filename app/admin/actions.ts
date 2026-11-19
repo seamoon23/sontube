@@ -13,6 +13,8 @@ import {
 import { resolveManagedCustomThumbnailPath, validateCustomThumbnailFile } from "@/lib/custom-thumbnail";
 import { prisma } from "@/lib/db";
 import { requireAdminSession } from "@/lib/admin-session";
+import { canPublishLite } from "@/lib/admin-auth";
+import { getFamilyVideoUsage, videoLimitMessage } from "@/lib/family-limits";
 import {
   IMPERSONATION_READ_ONLY_MESSAGE,
   isAdminMutationBlocked,
@@ -34,6 +36,9 @@ export async function createVideoAction(formData: FormData): Promise<ActionResul
   }
 
   const input = readVideoFormData(formData);
+  if (!canPublishLite(session, process.env) && (input.isLitePublished || Number(input.liteSortOrder) !== 0)) {
+    return { ok: false, message: "Lite 공개는 운영자만 설정할 수 있습니다." };
+  }
   const parsed = videoClientSchema.safeParse(input);
 
   if (!parsed.success) {
@@ -62,52 +67,59 @@ export async function createVideoAction(formData: FormData): Promise<ActionResul
     };
   }
 
-  const tagIds = await resolveTagIds(session.familyId, parsed.data.tagIds ?? [], parsed.data.quickNewTags ?? "");
+  const usage = await getFamilyVideoUsage(prisma, session.familyId);
+  if (!usage.canCreate) return { ok: false, message: videoLimitMessage(usage.limit) };
+
   const thumbnail = await resolveThumbnail(formData, videoIdResult.videoId, parsed.data.thumbnailType);
   if (!thumbnail.ok) {
     return { ok: false, message: thumbnail.message };
   }
-  const channel = await resolveChannelId(
-    session.familyId,
-    parsed.data.channelMode,
-    parsed.data.channelId,
-    parsed.data.newChannelName,
-  );
-  if (!channel.ok) {
-    return { ok: false, message: channel.message };
-  }
-
-  await prisma.$transaction(async (tx) => {
-    await tx.video.create({
-      data: {
-        familyId: session.familyId,
-        youtubeVideoId: videoIdResult.videoId,
-        originalUrl: parsed.data.originalUrl,
-        title: parsed.data.title,
-        channelId: channel.channelId,
-        description: emptyToNull(parsed.data.description),
-        searchKeywords: emptyToNull(parsed.data.searchKeywords),
-        durationText: emptyToNull(parsed.data.durationText),
-        thumbnailType: thumbnail.value.thumbnailType,
-        youtubeThumbnailUrl: thumbnail.value.youtubeThumbnailUrl,
-        customThumbnailPath: thumbnail.value.customThumbnailPath,
-        safetyStatus: parsed.data.safetyStatus as SafetyStatus,
-        isPublished: parsed.data.isPublished,
-        isLitePublished: parsed.data.isLitePublished,
-        liteSortOrder: parsed.data.liteSortOrder,
-        isParentRecommended: parsed.data.isParentRecommended,
-        parentRecommendedAt: parsed.data.isParentRecommended ? new Date() : null,
-        playMode: parsed.data.playMode as PlayMode,
-        tags: {
-          create: tagIds.map((tagId) => ({
-            tag: { connect: { id: tagId } },
-          })),
+  try {
+    await prisma.$transaction(async (tx) => {
+      const currentUsage = await getFamilyVideoUsage(tx, session.familyId);
+      if (!currentUsage.canCreate) throw new Error("family_video_limit");
+      const tagIds = await resolveTagIds(session.familyId, parsed.data.tagIds ?? [], parsed.data.quickNewTags ?? "", tx, canPublishLite(session, process.env));
+      const channel = await resolveChannelId(session.familyId, parsed.data.channelMode, parsed.data.channelId, parsed.data.newChannelName, tx);
+      if (!channel.ok) throw new VideoInputError(channel.message);
+      const created = await tx.video.create({
+        data: {
+          familyId: session.familyId,
+          youtubeVideoId: videoIdResult.videoId,
+          originalUrl: parsed.data.originalUrl,
+          title: parsed.data.title,
+          channelId: channel.channelId,
+          description: emptyToNull(parsed.data.description),
+          searchKeywords: emptyToNull(parsed.data.searchKeywords),
+          durationText: emptyToNull(parsed.data.durationText),
+          thumbnailType: thumbnail.value.thumbnailType,
+          youtubeThumbnailUrl: thumbnail.value.youtubeThumbnailUrl,
+          customThumbnailPath: thumbnail.value.customThumbnailPath,
+          safetyStatus: parsed.data.safetyStatus as SafetyStatus,
+          isPublished: parsed.data.isPublished,
+          isLitePublished: parsed.data.isLitePublished,
+          liteSortOrder: parsed.data.liteSortOrder,
+          isParentRecommended: parsed.data.isParentRecommended,
+          parentRecommendedAt: parsed.data.isParentRecommended ? new Date() : null,
+          playMode: parsed.data.playMode as PlayMode,
+          tags: {
+            create: tagIds.map((tagId) => ({
+              tag: { connect: { id: tagId } },
+            })),
+          },
         },
-      },
-    });
+      });
 
-    await refreshTagStats(tx, tagIds);
-  });
+      await refreshTagStats(tx, tagIds);
+      if (parsed.data.isLitePublished) await auditLitePublication(tx, session, true, created.id);
+    });
+  } catch (error) {
+    if (thumbnail.value.customThumbnailPath) await deleteManagedCustomThumbnailIfUnused(thumbnail.value.customThumbnailPath);
+    if (error instanceof VideoInputError) return { ok: false, message: error.message };
+    if (error instanceof Error && error.message.includes("family_video_limit")) {
+      return { ok: false, message: videoLimitMessage(usage.limit) };
+    }
+    return { ok: false, message: "영상을 등록하지 못했습니다. 목록과 연결 상태를 확인한 뒤 다시 시도해 주세요." };
+  }
 
   revalidateVideoPaths();
   redirect("/admin/videos");
@@ -129,6 +141,10 @@ export async function updateVideoAction(videoId: string, formData: FormData): Pr
   }
 
   const input = readVideoFormData(formData);
+  const liteOperator = canPublishLite(session, process.env);
+  if (!liteOperator && (input.isLitePublished || Number(input.liteSortOrder) !== 0)) {
+    return { ok: false, message: "Lite 공개는 운영자만 설정할 수 있습니다." };
+  }
   const parsed = videoClientSchema.safeParse(input);
 
   if (!parsed.success) {
@@ -157,7 +173,6 @@ export async function updateVideoAction(videoId: string, formData: FormData): Pr
   }
 
   const previousTagIds = existing.tags.map((tag) => tag.tagId);
-  const tagIds = await resolveTagIds(session.familyId, parsed.data.tagIds ?? [], parsed.data.quickNewTags ?? "");
   const previousCustomThumbnailPath = existing.customThumbnailPath;
   const thumbnail = await resolveThumbnail(
     formData,
@@ -168,50 +183,54 @@ export async function updateVideoAction(videoId: string, formData: FormData): Pr
   if (!thumbnail.ok) {
     return { ok: false, message: thumbnail.message };
   }
-  const channel = await resolveChannelId(
-    session.familyId,
-    parsed.data.channelMode,
-    parsed.data.channelId,
-    parsed.data.newChannelName,
-  );
-  if (!channel.ok) {
-    return { ok: false, message: channel.message };
-  }
-
-  await prisma.$transaction(async (tx) => {
-    await tx.video.update({
-      where: { id: videoId },
-      data: {
-        familyId: session.familyId,
-        youtubeVideoId: videoIdResult.videoId,
-        originalUrl: parsed.data.originalUrl,
-        title: parsed.data.title,
-        channelId: channel.channelId,
-        description: emptyToNull(parsed.data.description),
-        searchKeywords: emptyToNull(parsed.data.searchKeywords),
-        durationText: emptyToNull(parsed.data.durationText),
-        thumbnailType: thumbnail.value.thumbnailType,
-        youtubeThumbnailUrl: thumbnail.value.youtubeThumbnailUrl,
-        customThumbnailPath: thumbnail.value.customThumbnailPath,
-        safetyStatus: parsed.data.safetyStatus as SafetyStatus,
-        isPublished: parsed.data.isPublished,
-        isLitePublished: parsed.data.isLitePublished,
-        liteSortOrder: parsed.data.liteSortOrder,
-        isParentRecommended: parsed.data.isParentRecommended,
-        parentRecommendedAt:
-          parsed.data.isParentRecommended && !existing.isParentRecommended ? new Date() : existing.parentRecommendedAt,
-        playMode: parsed.data.playMode as PlayMode,
-        tags: {
-          deleteMany: {},
-          create: tagIds.map((tagId) => ({
-            tag: { connect: { id: tagId } },
-          })),
+  try {
+    await prisma.$transaction(async (tx) => {
+      const tagIds = await resolveTagIds(session.familyId, parsed.data.tagIds ?? [], parsed.data.quickNewTags ?? "", tx, liteOperator);
+      const channel = await resolveChannelId(session.familyId, parsed.data.channelMode, parsed.data.channelId, parsed.data.newChannelName, tx);
+      if (!channel.ok) throw new VideoInputError(channel.message);
+      await tx.video.update({
+        where: { id: videoId, familyId: session.familyId },
+        data: {
+          familyId: session.familyId,
+          youtubeVideoId: videoIdResult.videoId,
+          originalUrl: parsed.data.originalUrl,
+          title: parsed.data.title,
+          channelId: channel.channelId,
+          description: emptyToNull(parsed.data.description),
+          searchKeywords: emptyToNull(parsed.data.searchKeywords),
+          durationText: emptyToNull(parsed.data.durationText),
+          thumbnailType: thumbnail.value.thumbnailType,
+          youtubeThumbnailUrl: thumbnail.value.youtubeThumbnailUrl,
+          customThumbnailPath: thumbnail.value.customThumbnailPath,
+          safetyStatus: parsed.data.safetyStatus as SafetyStatus,
+          isPublished: parsed.data.isPublished,
+          // Editing by a non-operator withdraws any previous public approval.
+          isLitePublished: liteOperator && parsed.data.isLitePublished,
+          liteSortOrder: liteOperator ? parsed.data.liteSortOrder : 0,
+          isParentRecommended: parsed.data.isParentRecommended,
+          parentRecommendedAt:
+            parsed.data.isParentRecommended && !existing.isParentRecommended ? new Date() : existing.parentRecommendedAt,
+          playMode: parsed.data.playMode as PlayMode,
+          tags: {
+            deleteMany: {},
+            create: tagIds.map((tagId) => ({
+              tag: { connect: { id: tagId } },
+            })),
+          },
         },
-      },
-    });
+      });
 
-    await refreshTagStats(tx, [...previousTagIds, ...tagIds]);
-  });
+      await refreshTagStats(tx, [...previousTagIds, ...tagIds]);
+      if (existing.isLitePublished || parsed.data.isLitePublished) {
+        await auditLitePublication(tx, session, liteOperator && parsed.data.isLitePublished, videoId);
+      }
+    });
+  } catch (error) {
+    if (thumbnail.value.customThumbnailPath && thumbnail.value.customThumbnailPath !== previousCustomThumbnailPath) {
+      await deleteManagedCustomThumbnailIfUnused(thumbnail.value.customThumbnailPath);
+    }
+    return { ok: false, message: error instanceof VideoInputError ? error.message : "영상을 수정하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요." };
+  }
 
   if (previousCustomThumbnailPath && previousCustomThumbnailPath !== thumbnail.value.customThumbnailPath) {
     await deleteManagedCustomThumbnailIfUnused(previousCustomThumbnailPath);
@@ -270,6 +289,12 @@ export async function updateTagAction(tagId: string, formData: FormData): Promis
   });
   if (!target) {
     return { ok: false, message: "수정할 태그를 찾을 수 없습니다." };
+  }
+
+  if (!canPublishLite(session, process.env) && await prisma.videoTag.count({
+    where: { tagId, video: { familyId: session.familyId, isLitePublished: true } },
+  })) {
+    return { ok: false, message: "Lite 공개 영상에 사용 중인 태그는 운영자만 수정할 수 있습니다." };
   }
 
   const parsed = tagFormSchema.safeParse(readTagFormData(formData));
@@ -342,19 +367,30 @@ async function resolveTagIds(
   familyId: string,
   selectedTagIds: string[],
   quickNewTags: string | string[],
+  db: Prisma.TransactionClient = prisma,
+  liteOperator = false,
 ): Promise<string[]> {
-  const selectedTags = await prisma.tag.findMany({
+  const selectedTags = await db.tag.findMany({
     where: { id: { in: selectedTagIds }, familyId },
     select: { id: true },
   });
   const names = Array.isArray(quickNewTags) ? quickNewTags : splitTagNames(quickNewTags);
+  if (selectedTags.length !== new Set(selectedTagIds).size) {
+    throw new VideoInputError("현재 가족의 태그만 선택할 수 있습니다.");
+  }
   const createdIds: string[] = [];
 
   for (const name of names) {
     const slug = slugifyTagName(name);
     if (!slug) continue;
 
-    const tag = await prisma.tag.upsert({
+    if (!liteOperator && await db.tag.count({
+      where: { familyId, slug, isActive: false, videos: { some: { video: { isLitePublished: true } } } },
+    })) {
+      throw new VideoInputError("Lite 공개 영상에 사용 중인 태그는 운영자만 다시 활성화할 수 있습니다.");
+    }
+
+    const tag = await db.tag.upsert({
       where: { familyId_slug: { familyId, slug } },
       create: {
         familyId,
@@ -363,9 +399,7 @@ async function resolveTagIds(
         color: "#0369a1",
         isActive: true,
       },
-      update: {
-        isActive: true,
-      },
+      update: { isActive: true },
       select: { id: true },
     });
     createdIds.push(tag.id);
@@ -378,6 +412,7 @@ async function resolveChannelId(
   mode: "NONE" | "EXISTING" | "NEW",
   selectedChannelId?: string,
   newChannelName?: string,
+  db: Prisma.TransactionClient = prisma,
 ): Promise<{ ok: true; channelId: string | null } | { ok: false; message: string }> {
   if (mode === "NONE") {
     return { ok: true, channelId: null };
@@ -385,7 +420,7 @@ async function resolveChannelId(
 
   if (mode === "EXISTING") {
     const channelId = selectedChannelId?.trim() ?? "";
-    const channel = await prisma.channel.findFirst({
+    const channel = await db.channel.findFirst({
       where: { id: channelId, familyId },
       select: { id: true },
     });
@@ -413,7 +448,7 @@ async function resolveChannelId(
     return { ok: false, message: "사용할 수 있는 채널명을 입력해 주세요." };
   }
 
-  const channel = await prisma.channel.upsert({
+  const channel = await db.channel.upsert({
     where: { familyId_normalizedName: { familyId, normalizedName } },
     create: {
       familyId,
@@ -555,6 +590,26 @@ async function refreshTagStats(tx: Prisma.TransactionClient, tagIds: string[]) {
 function emptyToNull(value?: string | null): string | null {
   const trimmed = value?.trim() ?? "";
   return trimmed ? trimmed : null;
+}
+
+class VideoInputError extends Error {}
+
+async function auditLitePublication(
+  tx: Prisma.TransactionClient,
+  session: { userId: string; familyId: string },
+  published: boolean,
+  videoId?: string,
+) {
+  if (!published && !videoId) return;
+  await tx.superAdminAuditLog.create({
+    data: {
+      action: "LITE_PUBLICATION_UPDATED",
+      actorId: session.userId,
+      targetFamilyId: session.familyId,
+      targetUserId: session.userId,
+      metadataJson: JSON.stringify({ videoId, published }),
+    },
+  });
 }
 
 function revalidateVideoPaths() {

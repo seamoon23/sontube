@@ -19,12 +19,8 @@ export default async function AdminDashboardPage() {
     prisma.tag.count({ where: { ...familyWhere, isActive: true } }),
     prisma.family.findUniqueOrThrow({
       where: { id: session.familyId },
-      include: { subscription: true },
     }),
   ]);
-
-  const subscriptionActive =
-    family.subscription?.status === "ACTIVE" && family.subscription.expiresAt > new Date();
 
   return (
     <div className="grid gap-6">
@@ -48,18 +44,17 @@ export default async function AdminDashboardPage() {
 
       <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-[1fr_auto] md:items-center">
         <div>
-          <p className="text-xs font-bold text-ocean">이용권</p>
+          <p className="text-xs font-bold text-ocean">무료 가족 이용</p>
           <h3 className="mt-1 text-lg font-semibold text-ink">
-            {subscriptionActive ? "SonTube 이용 중" : "이용권 확인 필요"}
+            영상 {totalVideos} / {family.videoLimit}개
           </h3>
           <p className="mt-1 text-sm text-slate-600">
-            {subscriptionActive && family.subscription
-              ? `${formatDate(family.subscription.expiresAt)}까지 사용할 수 있습니다.`
-              : "입금 신청과 처리 상태를 결제 안내에서 확인할 수 있습니다."}
+            기본 한도는 가족당 20개이며 운영자가 무료로 승인한 가족은 한도가 다를 수 있습니다. 기간 제한이나 결제는 없습니다.
           </p>
+          {totalVideos >= family.videoLimit && <p className="mt-2 text-sm font-semibold text-amber-800">등록 한도에 도달했습니다. 기존 영상은 계속 관리하고 시청할 수 있습니다.</p>}
         </div>
         <Link href="/admin/payment" className="inline-flex min-h-11 items-center rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-ocean hover:text-ocean">
-          이용권·결제 보기
+          무료 이용 안내
         </Link>
       </section>
 
@@ -108,8 +103,4 @@ function Metric({ label, value, tone }: { label: string; value: number; tone: st
       <p className="mt-2 text-3xl font-bold text-ink">{value}</p>
     </div>
   );
-}
-
-function formatDate(value: Date): string {
-  return new Intl.DateTimeFormat("ko-KR", { dateStyle: "long" }).format(value);
 }

@@ -13,14 +13,13 @@ type DashboardProps = {
 export default async function SuperAdminDashboardPage({ searchParams }: DashboardProps) {
   await requireSuperAdminSession();
   const params = await searchParams;
-  const now = new Date();
   const [
     totalFamilies,
     activeFamilies,
     activeUsers,
     pendingPayments,
     pendingRefunds,
-    activeSubscriptions,
+    extendedFamilies,
     recentPayments,
     recentAudits,
   ] = await Promise.all([
@@ -29,7 +28,7 @@ export default async function SuperAdminDashboardPage({ searchParams }: Dashboar
     prisma.parentUser.count({ where: { isActive: true, family: { isActive: true } } }),
     prisma.paymentRequest.count({ where: { status: "PENDING" } }),
     prisma.paymentRefund.count({ where: { status: "REQUESTED" } }),
-    prisma.familySubscription.count({ where: { status: "ACTIVE", expiresAt: { gt: now } } }),
+    prisma.family.count({ where: { videoLimit: { gt: 20 } } }),
     prisma.paymentRequest.findMany({
       take: 6,
       orderBy: { requestedAt: "desc" },
@@ -54,7 +53,7 @@ export default async function SuperAdminDashboardPage({ searchParams }: Dashboar
           확인이 필요한 항목부터 봅니다
         </h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          결제 대기, 환불 요청, 사용자 활성 상태를 한 화면에서 확인합니다.
+          가족당 20개 무료로 운영합니다. 사용자·가족 메뉴에서 무료 한도를 승인하고, 과거 결제·환불 기록은 별도로 보존합니다.
         </p>
       </div>
 
@@ -62,7 +61,7 @@ export default async function SuperAdminDashboardPage({ searchParams }: Dashboar
         <Metric label="전체 가족" value={totalFamilies} />
         <Metric label="활성 가족" value={activeFamilies} />
         <Metric label="활성 보호자" value={activeUsers} />
-        <Metric label="활성 이용권" value={activeSubscriptions} />
+        <Metric label="한도 확대 가족" value={extendedFamilies} />
         <Metric label="입금 확인 대기" value={pendingPayments} urgent={pendingPayments > 0} />
         <Metric label="환불 처리 대기" value={pendingRefunds} urgent={pendingRefunds > 0} />
       </section>

@@ -7,8 +7,7 @@ import { logoutSuperAdminAction } from "@/app/superadmin/actions";
 const navItems = [
   { href: "/superadmin", label: "운영 현황" },
   { href: "/superadmin/users", label: "사용자·가족" },
-  { href: "/superadmin/plans", label: "요금제" },
-  { href: "/superadmin/payments", label: "입금 신청" },
+  { href: "/superadmin/payments", label: "과거 결제·환불" },
   { href: "/superadmin/audit", label: "감사 로그" },
 ];
 

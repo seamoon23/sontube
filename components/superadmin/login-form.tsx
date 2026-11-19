@@ -37,7 +37,7 @@ export function SuperAdminLoginForm({ setupRequired }: { setupRequired: boolean 
         </div>
         <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-950">운영 콘솔 로그인</h1>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          결제, 사용자 계정, 이용권을 다루는 별도 보호 구역입니다.
+          가족 계정, 무료 영상 한도와 과거 결제 기록을 다루는 별도 보호 구역입니다.
         </p>
       </div>
 

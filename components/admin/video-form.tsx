@@ -44,6 +44,7 @@ export type VideoFormInitial = {
 };
 
 type VideoFormProps = {
+  canPublishLite: boolean;
   mode: "create" | "edit";
   initial?: VideoFormInitial;
   tags: VideoFormTag[];
@@ -71,7 +72,7 @@ const defaultValues: VideoClientInput = {
   tagIds: [],
 };
 
-export function VideoForm({ mode, initial, tags, channels, existingVideos }: VideoFormProps) {
+export function VideoForm({ mode, initial, tags, channels, existingVideos, canPublishLite }: VideoFormProps) {
   const [result, setResult] = useState<ActionResult | null>(null);
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
@@ -95,8 +96,8 @@ export function VideoForm({ mode, initial, tags, channels, existingVideos }: Vid
           newChannelName: "",
           safetyStatus: initial.safetyStatus,
           isPublished: initial.isPublished,
-          isLitePublished: initial.isLitePublished,
-          liteSortOrder: initial.liteSortOrder,
+          isLitePublished: canPublishLite && initial.isLitePublished,
+          liteSortOrder: canPublishLite ? initial.liteSortOrder : 0,
           isParentRecommended: initial.isParentRecommended,
           playMode: initial.playMode,
           thumbnailType: initial.thumbnailType,
@@ -352,7 +353,7 @@ export function VideoForm({ mode, initial, tags, channels, existingVideos }: Vid
             <input type="checkbox" className="h-4 w-4 accent-ocean" {...register("isPublished")} />
             아이 화면에 공개
           </label>
-          <div className="grid gap-3 rounded-md border border-sky-200 bg-sky-50 p-3 md:col-span-3 md:grid-cols-[minmax(0,1fr)_160px] md:items-start">
+          {canPublishLite && <div className="grid gap-3 rounded-md border border-sky-200 bg-sky-50 p-3 md:col-span-3 md:grid-cols-[minmax(0,1fr)_160px] md:items-start">
             <div className="grid gap-2">
               <label className="flex items-start gap-3 text-sm font-medium text-slate-800">
                 <input
@@ -384,7 +385,7 @@ export function VideoForm({ mode, initial, tags, channels, existingVideos }: Vid
               />
               {errors.liteSortOrder && <span id="lite-sort-error" className="text-xs font-normal text-red-700">{errors.liteSortOrder.message}</span>}
             </label>
-          </div>
+          </div>}
           <label className="flex min-h-11 items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 md:col-span-3">
             <input type="checkbox" className="h-4 w-4 accent-coral" {...register("isParentRecommended")} />
             부모님 최근 추천에 올리기

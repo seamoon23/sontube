@@ -8,6 +8,7 @@ import {
   getAdminAllowedEmails,
   isAdminEmailAllowed,
   isAdminAuthConfigured,
+  canPublishLite,
   parseAdminSessionToken,
   verifyAdminPassword,
   verifyAdminSessionToken,
@@ -30,7 +31,7 @@ function createSignedTestToken(secret: string, payload: Record<string, unknown>)
 describe("admin auth helpers", () => {
   it("detects whether parent session signing is configured", () => {
     expect(isAdminAuthConfigured({})).toBe(false);
-    expect(isAdminAuthConfigured({ SESSION_SECRET: "secret" })).toBe(false);
+    expect(isAdminAuthConfigured({ SESSION_SECRET: "secret" })).toBe(true);
     expect(
       isAdminAuthConfigured({
         SESSION_SECRET: "secret",
@@ -42,7 +43,7 @@ describe("admin auth helpers", () => {
         SESSION_SECRET: "secret",
         ADMIN_ALLOWED_EMAILS: "parent@example.com",
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("normalizes and enforces the bounded parent email allowlist", () => {
@@ -56,6 +57,9 @@ describe("admin auth helpers", () => {
     ]);
     expect(isAdminEmailAllowed("PARENT@example.com", env)).toBe(true);
     expect(isAdminEmailAllowed("visitor@example.com", env)).toBe(false);
+    expect(canPublishLite({ email: "parent@example.com" }, env)).toBe(true);
+    expect(canPublishLite({ email: "parent@example.com", impersonatedBy: "owner" }, env)).toBe(false);
+    expect(canPublishLite({ email: "visitor@example.com" }, env)).toBe(false);
     expect(getAdminAllowedEmails({ ADMIN_ALLOWED_EMAILS: "not-an-email" })).toEqual([]);
     expect(getAdminAllowedEmails({ ADMIN_ALLOWED_EMAILS: "parent@example.com" })).toEqual([]);
     expect(

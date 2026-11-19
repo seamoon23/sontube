@@ -13,7 +13,7 @@ const navItems = [
   { href: "/admin/tags", label: "태그 관리" },
   { href: "/admin/insights", label: "관심 요약" },
   { href: "/admin/app-keys", label: "앱 키" },
-  { href: "/admin/payment", label: "이용권·결제" },
+  { href: "/admin/payment", label: "무료 이용 안내" },
 ];
 
 export function AdminNav() {
